@@ -108,6 +108,17 @@ button{cursor:pointer}
 .help{background:var(--panel-2);border-radius:16px;padding:14px 16px;color:var(--muted);line-height:1.55}
 .help b{color:var(--fg)}
 .help ol{margin:6px 0 0;padding-left:20px}
+.guide details{border-top:1px solid var(--line)}
+.guide details:first-of-type{border-top:0}
+.guide summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 0;font-weight:700;font-size:16px}
+.guide summary::-webkit-details-marker{display:none}
+.guide summary::after{content:"+";font-size:24px;line-height:1;color:var(--muted);transition:transform .2s}
+.guide details[open] summary::after{transform:rotate(45deg)}
+.guide .gbody{padding:0 0 18px;color:var(--muted);line-height:1.6}
+.guide .gbody b{color:var(--fg)}
+.guide ol,.guide ul{margin:6px 0 0;padding-left:22px}
+.guide li{margin:4px 0}
+.guide kbd{font-family:var(--f-ui);font-size:13px;font-weight:700;background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:var(--fg)}
 .confirm{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:color-mix(in srgb,var(--bad) 14%,transparent);border-radius:14px;padding:10px 12px;margin-top:12px}
 .confirm span{flex:1 1 200px;font-weight:600}
 .toasts{position:fixed;z-index:30;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;width:min(520px,calc(100% - 32px))}
@@ -286,7 +297,7 @@ function showSetup(msg) {
     <div class="row"><label class="field"><span>Adresse du PC</span><input id="pcIp" inputmode="decimal" placeholder="192.168.1.23" value="${esc(st.pc || "")}" autocomplete="off"></label>
     <label class="field" style="flex:0 1 200px"><span>Code</span><input id="pcCode" inputmode="numeric" maxlength="6" placeholder="000000" value="${esc(st.code || "")}" autocomplete="off"></label></div>
     <p class="err" id="setErr">${esc(msg || "")}</p>
-    <div class="foot">${st.pc ? `<button class="btn" data-act="cancel-setup">Annuler</button>` : ""}<button class="btn primary" data-act="save-pc">Connecter</button></div></div>`;
+    <div class="foot"><button class="btn" data-act="guide" style="margin-right:auto">Guide</button>${st.pc ? `<button class="btn" data-act="cancel-setup">Annuler</button>` : ""}<button class="btn primary" data-act="save-pc">Connecter</button></div></div>`;
 }
 
 /* ---------------- appuis ---------------- */
@@ -356,14 +367,54 @@ function openSettings(confirmReset) {
     <div class="toggle-row"><div>Colonnes</div><div class="chips">${[3, 4, 5, 6, 7].map(n => `<button class="chip" data-cols="${n}" aria-pressed="${st.cols === n}">${n}</button>`).join("")}</div></div>
     <div class="toggle-row"><div>Page « ${esc(st.pages[st.page].name)} »<small>Renommer ou supprimer la page affichée.</small></div><div class="chips"><button class="chip" data-act="rename-page">Renommer</button>${st.pages.length > 1 ? `<button class="chip" data-act="del-page">Supprimer</button>` : ""}</div></div>
     <div class="toggle-row"><div>États des boutons<small>Si un bouton affiche « Coupé » alors que ce n'est plus le cas.</small></div><button class="btn" data-act="reset-states">Tout éteindre</button></div>
-    <h3>Assigner un bouton dans Discord, Voicemod ou Medal</h3>
-    <div class="help">Chaque bouton envoie une touche spéciale (F13 à F24) qui n'existe pas sur ton clavier.<ol>
-      <li>Dans le logiciel, clique sur le champ du raccourci (Discord : Paramètres → Raccourcis clavier ; Voicemod : le raccourci de chaque son ou de la voix ; Medal : la touche de clip).</li>
-      <li>Appuie sur le bouton correspondant de la tablette. Le logiciel l'enregistre.</li></ol>
-      Astuce : un <b>appui long</b> sur un bouton à état corrige son affichage sans rien envoyer.</div>
+    <div class="toggle-row"><div>Guide<small>Installation, Discord, Voicemod, Medal, personnalisation, dépannage.</small></div><button class="btn primary" data-act="guide">Ouvrir le guide</button></div>
     ${AND ? `<h3>Tablette</h3><div class="chips"><button class="chip" data-native="openWifi">Wi-Fi</button><button class="chip" data-native="openSettings">Réglages Android</button><button class="chip" data-native="openSamsungHome">Écran d'accueil Samsung</button><button class="chip" data-native="checkUpdate">Mise à jour</button></div>` : ""}
     ${confirmReset ? `<div class="confirm"><span>Remettre tous les boutons d'origine ? Tes modifications seront perdues.</span><button class="btn" data-act="keep-set">Annuler</button><button class="btn danger solid" data-act="reset-yes">Remettre</button></div>` : ""}
     <div class="foot"><button class="btn danger left" data-act="reset-ask">Boutons d'origine</button><button class="btn primary" data-act="close">Fermer</button></div>
+  </div></div>`;
+}
+
+/* ---------------- guide ---------------- */
+function openGuide() {
+  $("#sheetRoot").innerHTML = `<div class="scrim" data-act="scrim"><div class="sheet guide" role="dialog" aria-modal="true">
+    <h2>Guide</h2>
+    <details open><summary>1. Installer le programme sur le PC</summary><div class="gbody"><ol>
+      <li>Sur le PC, télécharge <b>StreamDeckPC.exe</b> depuis la page Releases du repo <b>liseuse</b> sur GitHub.</li>
+      <li>Lance-le. Si Windows affiche « Windows a protégé votre ordinateur » : <b>Informations complémentaires</b>, puis <b>Exécuter quand même</b>.</li>
+      <li>Si le pare-feu demande, autorise les <b>réseaux privés</b>.</li>
+      <li>Réponds <b>O</b> à la question du démarrage automatique pour ne plus avoir à le lancer.</li></ol></div></details>
+    <details><summary>2. Relier la tablette</summary><div class="gbody"><ol>
+      <li>La fenêtre du programme affiche une <b>adresse</b> et un <b>code à 6 chiffres</b>.</li>
+      <li>Sur la tablette : Réglages → PC → <b>Changer</b>, tape l'adresse et le code.</li>
+      <li>Le rond en haut à gauche passe au vert : c'est connecté.</li></ol>
+      La tablette et le PC doivent être sur la même box. La tablette se reconnecte toute seule si le PC redémarre.</div></details>
+    <details><summary>3. Brancher Discord</summary><div class="gbody"><ol>
+      <li>Dans Discord : Paramètres utilisateur → <b>Raccourcis clavier</b> → ajouter un raccourci.</li>
+      <li>Choisis l'action pour couper le micro, clique sur le champ du raccourci, puis appuie sur <b>Micro</b> sur la tablette.</li>
+      <li>Ajoute un deuxième raccourci pour la sourdine et appuie sur <b>Casque</b>.</li></ol></div></details>
+    <details><summary>4. Brancher Voicemod</summary><div class="gbody"><ul>
+      <li><b>Voix</b> : dans les réglages de Voicemod, clique sur le raccourci qui active ou coupe le changement de voix, puis appuie sur <b>Voix</b>.</li>
+      <li><b>Soundboard</b> : sur chaque son, clique sur son raccourci puis appuie sur <b>Son 1</b>, <b>Son 2</b>… Renomme ensuite les boutons avec le crayon.</li>
+      <li><b>Stop sons</b> : assigne-le au raccourci qui arrête tous les sons.</li></ul>
+      Tes potes entendent les sons sur Discord tant que Voicemod est réglé comme micro dans Discord.</div></details>
+    <details><summary>5. Brancher Medal</summary><div class="gbody">Dans Medal, ouvre les réglages des clips, clique sur la touche qui enregistre un clip, puis appuie sur <b>Clip</b>. Après un but, un appui suffit pour garder l'action.</div></details>
+    <details><summary>6. Personnaliser les boutons</summary><div class="gbody"><ul>
+      <li>Touche le <b>crayon</b> en haut : les boutons bougent légèrement, touche-en un pour le modifier (nom, couleur, icône, touche envoyée).</li>
+      <li><b>Ajouter</b> crée un nouveau bouton sur la page affichée, <b>+ Page</b> crée une page.</li>
+      <li><b>Bouton à état</b> : le bouton reste allumé tant que c'est actif (micro coupé, voix activée…).</li>
+      <li><b>Tester</b> envoie la touche tout de suite, pratique pour l'assigner dans un logiciel.</li>
+      <li>Réglages → <b>Colonnes</b> pour des boutons plus grands ou plus petits.</li></ul></div></details>
+    <details><summary>7. Astuces</summary><div class="gbody"><ul>
+      <li>Les boutons envoient des touches comme <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>F13</kbd> qui n'existent pas sur ton clavier : aucun conflit avec Rocket League, et ça marche en pleine partie.</li>
+      <li>Si un bouton affiche « Coupé » alors que ce n'est plus le cas, fais un <b>appui long</b> dessus : l'affichage se corrige sans rien envoyer.</li>
+      <li>Les boutons de la page <b>Musique & PC</b> contrôlent Spotify, YouTube ou ton lecteur sans rien régler.</li></ul></div></details>
+    <details><summary>Ça ne marche pas ?</summary><div class="gbody"><ul>
+      <li><b>Rond orange ou « PC introuvable »</b> : vérifie que StreamDeckPC est ouvert sur le PC et que les deux appareils sont sur le même Wi-Fi. Si l'adresse affichée par le PC a changé, mets-la à jour dans Réglages → PC.</li>
+      <li><b>« Code refusé »</b> : retape le code affiché dans la fenêtre du PC.</li>
+      <li><b>Le bouton clignote en vert mais rien ne se passe</b> : la touche n'est pas encore assignée dans le logiciel (voir étapes 3 à 5).</li>
+      <li><b>Le pare-feu a bloqué le programme</b> : Paramètres Windows → Pare-feu → Autoriser une application → coche StreamDeckPC pour les réseaux privés.</li>
+      <li><b>L'antivirus supprime le .exe</b> : c'est fréquent pour un programme non signé qui simule des touches. Ajoute-le aux exceptions si tu lui fais confiance.</li></ul></div></details>
+    <div class="foot"><button class="btn" data-act="settings">Réglages</button><button class="btn primary" data-act="close">Fermer</button></div>
   </div></div>`;
 }
 
@@ -405,6 +456,8 @@ document.addEventListener("click", async e => {
   else if (act === "reset-ask") openSettings(true);
   else if (act === "keep-set") openSettings();
   else if (act === "reset-yes") { st.pages = defaults(); st.page = 0; st.states = {}; save(); $("#sheetRoot").innerHTML = ""; render(); toast("Boutons d'origine remis."); }
+  else if (act === "guide") openGuide();
+  else if (act === "settings") openSettings();
   else if (act === "setup") { $("#sheetRoot").innerHTML = ""; showSetup(); }
   else if (act === "cancel-setup") showDeck();
   else if (act === "save-pc") {

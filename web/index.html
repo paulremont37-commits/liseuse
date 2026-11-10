@@ -282,6 +282,16 @@ input[type=range]{accent-color:var(--accent)}
 .bk-flow blockquote{margin:0 0 .8em 1em;font-style:italic}
 .bk-meta{position:absolute;left:0;right:0;bottom:calc(16px + env(safe-area-inset-bottom,0px));text-align:center;font-family:var(--f-ui);font-size:12.5px;opacity:.55;font-variant-numeric:tabular-nums;pointer-events:none}
 
+.guide details{border-top:1px solid var(--line)}
+.guide h3 + details{border-top:0}
+.guide summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 0;font-weight:600}
+.guide summary::-webkit-details-marker{display:none}
+.guide summary::after{content:"+";font-size:22px;line-height:1;color:var(--muted);transition:transform .2s}
+.guide details[open] summary::after{transform:rotate(45deg)}
+.guide .gbody{padding:0 0 16px;color:var(--muted);line-height:1.55;max-width:68ch}
+.guide .gbody b{color:var(--fg)}
+.guide ol,.guide ul{margin:6px 0 0;padding-left:20px}
+.guide li{margin:3px 0}
 .clock{margin-top:auto;text-align:center;font-variant-numeric:tabular-nums;color:var(--muted);font-size:12px;line-height:1.3;padding-bottom:6px}
 .clock b{display:block;font-family:var(--f-display);font-size:20px;color:var(--fg);letter-spacing:-.02em}
 .is-android [data-act="pick-dir"],.is-android #rFull{display:none!important}
@@ -864,6 +874,29 @@ function sw(key) { return `<button class="switch" role="switch" data-toggle="${k
 function viewSettings() {
   const ex = works.filter(w => w.example).length;
   return `<div class="topbar"><h1>Réglages</h1></div><div class="settings">
+  <div class="group guide"><h3>Guide</h3>
+    <details><summary>Ajouter tes mangas, BD et livres</summary><div class="gbody">
+      <ol><li>Dans <b>Bibliothèque</b>, touche <b>Ajouter</b>.</li><li>Choisis un ou plusieurs fichiers : <b>CBZ</b>, <b>ZIP</b>, <b>PDF</b>, <b>EPUB</b> ou des images.</li><li>Vérifie le titre et choisis le type : <b>Manga</b>, <b>BD</b>, <b>Webtoon</b> ou <b>Livre</b>. Le type règle le sens de lecture.</li></ol>
+      Les fichiers sont copiés sur la tablette : tu peux supprimer l'original, et tout se lit sans connexion. Les fichiers CBR ne sont pas encore lus : convertis-les en CBZ.</div></details>
+    <details><summary>Lire un manga, une BD ou un webtoon</summary><div class="gbody">
+      <ul><li><b>Tourner la page</b> : tape sur le bord gauche ou droit, ou glisse du doigt. En manga, on avance en tapant à <b>gauche</b>.</li>
+      <li><b>Zoomer</b> : double-tap, ou écarte deux doigts. Double-tap à nouveau pour revenir.</li>
+      <li><b>Menu</b> : tape au centre. Le curseur en bas saute à n'importe quelle page, le bouton en haut à droite change le sens, le fond et la double page.</li>
+      <li><b>En paysage</b>, deux pages s'affichent côte à côte (désactivable dans Réglages).</li>
+      <li><b>Webtoon</b> : fais simplement défiler vers le bas.</li></ul></div></details>
+    <details><summary>Lire un livre</summary><div class="gbody">
+      Tape à droite pour avancer, à gauche pour revenir. Au centre, le menu donne accès à la taille du texte, à la police et au fond (papier, sombre ou blanc). En paysage, le texte se met sur deux colonnes.</div></details>
+    <details><summary>Ranger ta bibliothèque</summary><div class="gbody">
+      <ul><li>Touche une couverture pour ouvrir sa <b>fiche</b> : renommer, changer le type ou le sens de lecture, recommencer, marquer comme lu, supprimer.</li>
+      <li>Les filtres <b>Manga</b>, <b>BD</b>, <b>Webtoons</b>, <b>Livres</b>, la recherche et le tri sont en haut de la bibliothèque.</li>
+      <li><b>Reprendre</b> affiche les titres en cours, <b>Historique</b> tout ce que tu as ouvert.</li></ul></div></details>
+    <details><summary>Boutons de la tablette et mode avancé</summary><div class="gbody">
+      <ul><li><b>Retour</b> : ferme le lecteur ou la fenêtre ouverte.</li><li><b>Accueil</b> : revient à la bibliothèque.</li>
+      <li><b>Mode avancé</b> : appui long de 3 secondes sur le logo « liseuse. » (ou sur le titre de la page). Tu y trouves le Wi-Fi, les réglages Android, l'écran d'accueil Samsung et la recherche de mise à jour.</li>
+      <li>Les barres d'Android sont cachées : glisse depuis le bord de l'écran pour les faire apparaître.</li></ul></div></details>
+    <details><summary>Mises à jour</summary><div class="gbody">
+      La liseuse vérifie toute seule s'il y a une nouvelle version quand elle a internet, et l'applique au démarrage suivant. Pour forcer : mode avancé → <b>Rechercher une mise à jour</b>. Ta bibliothèque n'est jamais touchée.</div></details>
+  </div>
   <div class="group"><h3>Apparence</h3>
     <div class="set"><div class="lbl">Thème de l'appli</div>${seg("theme", [["system", "Système"], ["light", "Clair"], ["dark", "Sombre"]])}</div></div>
   <div class="group"><h3>Sens de lecture par défaut</h3>
