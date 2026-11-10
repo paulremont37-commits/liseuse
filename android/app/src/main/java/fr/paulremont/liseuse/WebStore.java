@@ -30,7 +30,7 @@ import java.util.Map;
  */
 class WebStore {
 
-    static final String REMOTE = "https://paulremont37-commits.github.io/liseuse/";
+    static final String REMOTE = BuildConfig.WEB_REMOTE;
 
     interface Ready { void onReady(String version); }
 

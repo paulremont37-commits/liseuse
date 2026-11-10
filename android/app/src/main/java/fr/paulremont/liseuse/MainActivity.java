@@ -35,6 +35,14 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
 import java.util.List;
+import java.util.concurrent.TimeUnit;
+
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
+import okhttp3.WebSocket;
+import okhttp3.WebSocketListener;
+import org.json.JSONObject;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -205,7 +213,7 @@ public class MainActivity extends Activity {
         rescue.setClickable(true);
 
         TextView title = new TextView(this);
-        title.setText("La liseuse ne s'affiche pas");
+        title.setText(getString(R.string.app_name) + " ne s'affiche pas");
         title.setTextColor(0xFFF2F0F9);
         title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 24);
         title.setTypeface(Typeface.DEFAULT_BOLD);
@@ -350,6 +358,41 @@ public class MainActivity extends Activity {
         return "'" + s.replaceAll("[^A-Za-z0-9._-]", "") + "'";
     }
 
+    /* ---------- connexion Wi-Fi au PC (Stream Deck) ---------- */
+
+    private OkHttpClient http;
+    private WebSocket sock;
+    private int sockId = 0;
+
+    private void wsEvent(int id, String ev, String data) {
+        String js = "window.__deckWs && window.__deckWs(" + id + ",'" + ev + "'," + JSONObject.quote(data == null ? "" : data) + ")";
+        runOnUiThread(() -> { if (web != null) web.evaluateJavascript(js, null); });
+    }
+
+    private synchronized void wsConnect(int id, String url) {
+        if (url == null || !(url.startsWith("ws://") || url.startsWith("wss://"))) { wsEvent(id, "close", "adresse invalide"); return; }
+        if (sock != null) { sock.cancel(); sock = null; }
+        if (http == null) http = new OkHttpClient.Builder().connectTimeout(4, TimeUnit.SECONDS).pingInterval(20, TimeUnit.SECONDS).build();
+        sockId = id;
+        Request req;
+        try { req = new Request.Builder().url(url).build(); } catch (Exception e) { wsEvent(id, "close", "adresse invalide"); return; }
+        sock = http.newWebSocket(req, new WebSocketListener() {
+            @Override public void onOpen(WebSocket ws, Response r) { wsEvent(id, "open", ""); }
+            @Override public void onMessage(WebSocket ws, String text) { wsEvent(id, "message", text); }
+            @Override public void onClosing(WebSocket ws, int code, String reason) { ws.close(1000, null); }
+            @Override public void onClosed(WebSocket ws, int code, String reason) { wsEvent(id, "close", reason); }
+            @Override public void onFailure(WebSocket ws, Throwable t, Response r) { wsEvent(id, "close", t.getMessage()); }
+        });
+    }
+
+    private synchronized void wsSend(int id, String text) {
+        if (sock != null && id == sockId) sock.send(text);
+    }
+
+    private synchronized void wsClose(int id) {
+        if (sock != null && id == sockId) { sock.close(1000, null); sock = null; }
+    }
+
     private void open(Intent i) {
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         try {
@@ -398,6 +441,15 @@ public class MainActivity extends Activity {
                 if (rescue != null) rescue.setVisibility(View.GONE);
             });
         }
+
+        @JavascriptInterface
+        public void wsConnect(int id, String url) { MainActivity.this.wsConnect(id, url); }
+
+        @JavascriptInterface
+        public void wsSend(int id, String text) { MainActivity.this.wsSend(id, text); }
+
+        @JavascriptInterface
+        public void wsClose(int id) { MainActivity.this.wsClose(id); }
 
         @JavascriptInterface
         public void checkUpdate() { runOnUiThread(MainActivity.this::checkForUpdate); }

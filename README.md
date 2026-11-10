@@ -32,3 +32,18 @@ Si la question n'apparaît pas : Réglages → Applications → Choisir les appl
 Modifier `web/` met à jour la tablette au prochain lancement de la liseuse (ou via « Rechercher une mise à jour » dans le mode avancé). Modifier `android/` produit un nouvel APK à réinstaller.
 
 La clé de signature (`android/liseuse.keystore`) est dans le repo pour que chaque APK puisse remplacer le précédent. C'est une appli perso installée à la main : ne pas réutiliser cette clé pour autre chose.
+
+## Stream Deck
+
+La même coque fait aussi un Stream Deck : la tablette devient une grille de gros boutons qui envoient des raccourcis à ton PC Windows en Wi-Fi (Discord, Voicemod, Medal, musique, volume).
+
+| Fichier (page Releases) | Où l'installer |
+| --- | --- |
+| `stream-deck.apk` | Sur la tablette |
+| `StreamDeckPC.exe` | Sur le PC (Windows) |
+
+1. Sur le PC, lance `StreamDeckPC.exe`. Windows peut afficher « Windows a protégé votre ordinateur » : clique sur **Informations complémentaires**, puis **Exécuter quand même**. Si le pare-feu demande, autorise les **réseaux privés**.
+2. La fenêtre affiche une adresse et un code à 6 chiffres. Tape-les sur la tablette.
+3. Pour assigner un bouton dans Discord, Voicemod ou Medal : clique sur le champ du raccourci dans le logiciel, puis appuie sur le bouton de la tablette.
+
+Le programme PC n'exécute que des raccourcis clavier et des touches multimédia : aucune commande ni aucun fichier ne peut être lancé depuis la tablette, et il faut le code pour s'y connecter.

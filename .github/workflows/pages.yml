@@ -1,10 +1,11 @@
-name: Interface en ligne
+name: Interfaces en ligne
 
 on:
   push:
     branches: [main]
     paths:
       - 'web/**'
+      - 'deck/**'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
@@ -26,17 +27,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Liste des fichiers et numéro de version
-        working-directory: web
+      - name: Assembler le site (liseuse à la racine, Stream Deck dans /deck)
         run: |
+          mkdir site
+          cp -r web/. site/
+          mkdir site/deck
+          cp -r deck/. site/deck/
           python3 - <<'EOF'
           import os, json
-          files = sorted(
-              os.path.relpath(os.path.join(root, f), ".").replace(os.sep, "/")
-              for root, _, names in os.walk(".") for f in names if f != "version.json"
-          )
-          json.dump({"version": os.environ["GITHUB_SHA"][:7], "files": files}, open("version.json", "w"))
-          print(len(files), "fichiers")
+          sha = os.environ["GITHUB_SHA"][:7]
+          def write(folder, skip=()):
+              files = sorted(
+                  os.path.relpath(os.path.join(root, f), folder).replace(os.sep, "/")
+                  for root, _, names in os.walk(folder) for f in names if f != "version.json"
+              )
+              files = [f for f in files if not any(f.startswith(s) for s in skip)]
+              json.dump({"version": sha, "files": files}, open(os.path.join(folder, "version.json"), "w"))
+              print(folder, len(files), "fichiers")
+          write("site/deck")
+          write("site", skip=("deck/",))
           EOF
 
       - uses: actions/configure-pages@v5
@@ -45,7 +54,7 @@ jobs:
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: web
+          path: site
 
       - id: deploy
         uses: actions/deploy-pages@v4

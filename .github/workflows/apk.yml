@@ -1,10 +1,13 @@
-name: Appli Android
+name: Applis (Android + PC)
 
 on:
   push:
     branches: [main]
     paths:
       - 'android/**'
+      - 'agent/**'
+      - 'web/**'
+      - 'deck/**'
       - '.github/workflows/apk.yml'
   workflow_dispatch:
 
@@ -12,7 +15,7 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  android:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -26,24 +29,59 @@ jobs:
         with:
           gradle-version: '8.7'
 
-      - name: Compiler l'APK
+      - name: Compiler les deux APK
         run: gradle -p android assembleRelease --no-daemon --stacktrace
 
       - name: Renommer
-        run: cp android/app/build/outputs/apk/release/app-release.apk liseuse.apk
+        run: |
+          cp android/app/build/outputs/apk/liseuse/release/app-liseuse-release.apk liseuse.apk
+          cp android/app/build/outputs/apk/deck/release/app-deck-release.apk stream-deck.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: liseuse-apk
-          path: liseuse.apk
+          name: apk
+          path: |
+            liseuse.apk
+            stream-deck.apk
+
+  pc:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Fabriquer StreamDeckPC.exe
+        run: |
+          pip install -r agent/requirements.txt
+          pyinstaller --onefile --console --name StreamDeckPC agent/agent.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pc
+          path: dist/StreamDeckPC.exe
+
+  release:
+    needs: [android, pc]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
 
       - name: Publier la version
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.${{ github.run_number }}
-          name: Liseuse 1.0.${{ github.run_number }}
+          name: Version 1.0.${{ github.run_number }}
           make_latest: true
-          files: liseuse.apk
+          files: |
+            liseuse.apk
+            stream-deck.apk
+            StreamDeckPC.exe
           body: |
-            Télécharge **liseuse.apk** depuis la tablette, puis installe-le.
-            L'interface se met à jour toute seule ensuite : pas besoin de réinstaller l'APK à chaque changement.
+            - **liseuse.apk** : la liseuse (mangas, BD, livres), pour la tablette.
+            - **stream-deck.apk** : le Stream Deck, pour la tablette.
+            - **StreamDeckPC.exe** : le programme à lancer sur le PC pour le Stream Deck.

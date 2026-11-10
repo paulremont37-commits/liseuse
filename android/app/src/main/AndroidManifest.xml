@@ -2,6 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <!-- Pour retrouver l'écran d'accueil Samsung depuis le mode avancé -->
     <queries>
@@ -12,11 +13,12 @@
     </queries>
 
     <application
-        android:label="Liseuse"
+        android:label="@string/app_name"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
         android:theme="@style/Liseuse"
         android:allowBackup="false"
+        android:usesCleartextTraffic="${cleartext}"
         android:hardwareAccelerated="true">
 
         <activity

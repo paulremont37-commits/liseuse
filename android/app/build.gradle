@@ -5,6 +5,7 @@ plugins {
 // Numéro de version = numéro du build GitHub (1 en local)
 def runNumber = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInteger()
 def ksPass = System.getenv("KS_PASS") ?: "liseuse-tab"
+def pages = "https://paulremont37-commits.github.io/liseuse/"
 
 android {
     namespace 'fr.paulremont.liseuse'
@@ -16,6 +17,30 @@ android {
         targetSdk 34
         versionCode runNumber
         versionName "1.0." + runNumber
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    // Deux applis avec la même coque : la liseuse et le Stream Deck
+    flavorDimensions = ["app"]
+    productFlavors {
+        liseuse {
+            dimension "app"
+            applicationId "fr.paulremont.liseuse"
+            resValue "string", "app_name", "Liseuse"
+            buildConfigField "String", "WEB_REMOTE", "\"${pages}\""
+            manifestPlaceholders = [cleartext: "false"]
+        }
+        deck {
+            dimension "app"
+            applicationId "fr.paulremont.deck"
+            resValue "string", "app_name", "Stream Deck"
+            buildConfigField "String", "WEB_REMOTE", "\"${pages}deck/\""
+            // Le Stream Deck parle au PC en Wi-Fi local, sans chiffrement (ws://)
+            manifestPlaceholders = [cleartext: "true"]
+        }
     }
 
     signingConfigs {
@@ -42,16 +67,27 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 
-    // L'interface (dossier web/ du repo) est embarquée dans l'APK pour marcher hors ligne dès le premier lancement.
+    // L'interface est embarquée dans l'APK pour marcher hors ligne dès le premier lancement.
     sourceSets {
-        main {
-            assets.srcDirs = ['src/main/assets', "$rootDir/build/webassets"]
+        liseuse {
+            assets.srcDirs += ["$rootDir/build/assets-liseuse"]
+        }
+        deck {
+            assets.srcDirs += ["$rootDir/build/assets-deck"]
         }
     }
 }
 
-tasks.register('copyWeb', Copy) {
-    from "$rootDir/../web"
-    into "$rootDir/build/webassets/web"
+dependencies {
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
 }
-tasks.named('preBuild') { dependsOn 'copyWeb' }
+
+tasks.register('copyWebLiseuse', Copy) {
+    from "$rootDir/../web"
+    into "$rootDir/build/assets-liseuse/web"
+}
+tasks.register('copyWebDeck', Copy) {
+    from "$rootDir/../deck"
+    into "$rootDir/build/assets-deck/web"
+}
+tasks.named('preBuild') { dependsOn 'copyWebLiseuse', 'copyWebDeck' }
