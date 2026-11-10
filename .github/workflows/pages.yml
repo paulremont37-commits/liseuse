@@ -1,0 +1,51 @@
+name: Interface en ligne
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'web/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Liste des fichiers et numéro de version
+        working-directory: web
+        run: |
+          python3 - <<'EOF'
+          import os, json
+          files = sorted(
+              os.path.relpath(os.path.join(root, f), ".").replace(os.sep, "/")
+              for root, _, names in os.walk(".") for f in names if f != "version.json"
+          )
+          json.dump({"version": os.environ["GITHUB_SHA"][:7], "files": files}, open("version.json", "w"))
+          print(len(files), "fichiers")
+          EOF
+
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+
+      - id: deploy
+        uses: actions/deploy-pages@v4

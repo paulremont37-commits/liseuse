@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Un livre ouvert, couleur ambre de l'interface -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFB547"
+        android:pathData="M31,39 C40,35 47,36 52,40 L52,72 C47,68 40,67 31,71 Z" />
+    <path
+        android:fillColor="#FFFF6F91"
+        android:pathData="M56,40 C61,36 68,35 77,39 L77,71 C68,67 61,68 56,72 Z" />
+</vector>

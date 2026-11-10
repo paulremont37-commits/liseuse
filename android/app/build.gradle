@@ -1,0 +1,57 @@
+plugins {
+    id 'com.android.application'
+}
+
+// Numéro de version = numéro du build GitHub (1 en local)
+def runNumber = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInteger()
+def ksPass = System.getenv("KS_PASS") ?: "liseuse-tab"
+
+android {
+    namespace 'fr.paulremont.liseuse'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "fr.paulremont.liseuse"
+        minSdk 26
+        targetSdk 34
+        versionCode runNumber
+        versionName "1.0." + runNumber
+    }
+
+    signingConfigs {
+        release {
+            storeFile file("../liseuse.keystore")
+            storePassword ksPass
+            keyAlias "liseuse"
+            keyPassword ksPass
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+        debug {
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    // L'interface (dossier web/ du repo) est embarquée dans l'APK pour marcher hors ligne dès le premier lancement.
+    sourceSets {
+        main {
+            assets.srcDirs = ['src/main/assets', "$rootDir/build/webassets"]
+        }
+    }
+}
+
+tasks.register('copyWeb', Copy) {
+    from "$rootDir/../web"
+    into "$rootDir/build/webassets/web"
+}
+tasks.named('preBuild') { dependsOn 'copyWeb' }
