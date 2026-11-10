@@ -6,6 +6,16 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageInfo;
 import android.content.pm.ResolveInfo;
+import android.graphics.Typeface;
+import android.os.Handler;
+import android.os.Looper;
+import android.util.TypedValue;
+import android.view.Gravity;
+import android.view.ViewGroup;
+import android.widget.Button;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.net.Uri;
 import android.os.BatteryManager;
 import android.os.Build;
@@ -25,6 +35,8 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Écran d'accueil de la liseuse : une WebView plein écran qui affiche l'interface (dossier web/ du repo).
@@ -42,15 +54,32 @@ public class MainActivity extends Activity {
     private WebStore store;
     private ValueCallback<Uri[]> fileCallback;
     private long lastCheck = 0;
+    private FrameLayout root;
+    private LinearLayout rescue;
+    private volatile boolean ready = false;
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private static final int MIN_CHROME = 80;
+    private final Runnable watchdog = () -> {
+        if (!ready) showRescue("L'interface n'a pas démarré" + versionNote() + ".");
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         store = new WebStore(this);
 
-        web = new WebView(this);
+        root = new FrameLayout(this);
+        root.setBackgroundColor(0xFF15141C);
+        setContentView(root);
+        try {
+            web = new WebView(this);
+        } catch (Throwable t) {
+            // Pas de composant WebView utilisable : écran de secours au lieu d'un plantage
+            showRescue("Le composant qui affiche les pages (Android System WebView) est absent ou désactivé.");
+            return;
+        }
         web.setBackgroundColor(0xFF15141C);
-        setContentView(web);
+        root.addView(web, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
@@ -103,7 +132,135 @@ public class MainActivity extends Activity {
 
         web.loadUrl(START);
         hideSystemBars();
+        int v = chromeVersion();
+        if (v > 0 && v < MIN_CHROME) {
+            showRescue("Le moteur d'affichage du téléphone est trop ancien (version " + v + ", il faut au moins " + MIN_CHROME + ").");
+        } else {
+            handler.postDelayed(watchdog, 12000);
+        }
         checkForUpdate();
+    }
+
+    /* ---------- écran de secours (si l'interface ne s'affiche pas) ---------- */
+
+    private int dp(int v) {
+        return Math.round(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, getResources().getDisplayMetrics()));
+    }
+
+    private int chromeVersion() {
+        try {
+            Matcher m = Pattern.compile("Chrome/(\\d+)").matcher(WebSettings.getDefaultUserAgent(this));
+            if (m.find()) return Integer.parseInt(m.group(1));
+        } catch (Throwable ignored) {
+        }
+        return -1;
+    }
+
+    private String versionNote() {
+        int v = chromeVersion();
+        return v > 0 ? " (moteur d'affichage version " + v + ")" : "";
+    }
+
+    /** Paquet qui fournit l'affichage des pages : Chrome sur Android 7 à 9 en général, sinon Android System WebView. */
+    private String webViewPackage() {
+        if (Build.VERSION.SDK_INT >= 26) {
+            try {
+                PackageInfo p = WebView.getCurrentWebViewPackage();
+                if (p != null) return p.packageName;
+            } catch (Throwable ignored) {
+            }
+        }
+        try {
+            if (getPackageManager().getApplicationInfo("com.android.chrome", 0).enabled) return "com.android.chrome";
+        } catch (Exception ignored) {
+        }
+        return "com.google.android.webview";
+    }
+
+    private Button rescueButton(String label, boolean primary, View.OnClickListener l) {
+        Button b = new Button(this);
+        b.setText(label);
+        b.setAllCaps(false);
+        b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17);
+        b.setTextColor(primary ? 0xFF241703 : 0xFFF2F0F9);
+        b.setBackgroundColor(primary ? 0xFFFFB547 : 0xFF272635);
+        b.setOnClickListener(l);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(52));
+        lp.topMargin = dp(10);
+        b.setLayoutParams(lp);
+        return b;
+    }
+
+    private void showRescue(String why) {
+        if (rescue != null) {
+            ((TextView) rescue.getChildAt(1)).setText(why + "\n\nMets à jour « Chrome » et « Android System WebView » dans le Play Store, puis touche Réessayer.");
+            rescue.setVisibility(View.VISIBLE);
+            return;
+        }
+        rescue = new LinearLayout(this);
+        rescue.setOrientation(LinearLayout.VERTICAL);
+        rescue.setGravity(Gravity.CENTER);
+        rescue.setBackgroundColor(0xFF15141C);
+        rescue.setPadding(dp(32), dp(32), dp(32), dp(32));
+        rescue.setClickable(true);
+
+        TextView title = new TextView(this);
+        title.setText("La liseuse ne s'affiche pas");
+        title.setTextColor(0xFFF2F0F9);
+        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 24);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        rescue.addView(title);
+
+        TextView body = new TextView(this);
+        body.setText(why + "\n\nMets à jour « Chrome » et « Android System WebView » dans le Play Store, puis touche Réessayer.");
+        body.setTextColor(0xFFA3A0B8);
+        body.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+        body.setPadding(0, dp(12), 0, dp(12));
+        rescue.addView(body);
+
+        rescue.addView(rescueButton("Mettre à jour dans le Play Store", true, v -> openStore(webViewPackage())));
+        rescue.addView(rescueButton("Réessayer", false, v -> retry()));
+        rescue.addView(rescueButton("Ouvrir l'écran d'accueil Samsung", false, v -> goOtherHome()));
+        rescue.addView(rescueButton("Choisir l'écran d'accueil par défaut", false, v -> open(new Intent(Settings.ACTION_HOME_SETTINGS))));
+        rescue.addView(rescueButton("Réglages", false, v -> open(new Intent(Settings.ACTION_SETTINGS))));
+
+        root.addView(rescue, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+    }
+
+    private void retry() {
+        if (web == null) { recreate(); return; }
+        if (rescue != null) rescue.setVisibility(View.GONE);
+        ready = false;
+        web.reload();
+        handler.removeCallbacks(watchdog);
+        handler.postDelayed(watchdog, 12000);
+    }
+
+    private void openStore(String pkg) {
+        Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=" + pkg));
+        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        try {
+            startActivity(i);
+        } catch (Exception e) {
+            open(new Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=" + pkg)));
+        }
+    }
+
+    /** Ouvre l'écran d'accueil d'origine (Samsung en priorité) sans changer celui par défaut. */
+    private void goOtherHome() {
+        Intent home = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME);
+        List<ResolveInfo> list = getPackageManager().queryIntentActivities(home, 0);
+        ResolveInfo pick = null;
+        for (ResolveInfo ri : list) {
+            String pkg = ri.activityInfo.packageName;
+            if (pkg.equals(getPackageName())) continue;
+            if (pkg.contains("sec.android.app.launcher") || pkg.contains("sec.android.app.twlauncher")) { pick = ri; break; }
+            if (pick == null && !pkg.equals("com.android.settings")) pick = ri;
+        }
+        if (pick == null) { open(new Intent(Settings.ACTION_HOME_SETTINGS)); return; }
+        Intent i = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME);
+        i.setClassName(pick.activityInfo.packageName, pick.activityInfo.name);
+        open(i);
     }
 
     @Override
@@ -127,6 +284,7 @@ public class MainActivity extends Activity {
     /** Bouton retour : l'interface décide (fermer le lecteur, une fenêtre…). Un écran d'accueil ne se ferme jamais. */
     @Override
     public void onBackPressed() {
+        if (web == null) return;
         web.evaluateJavascript("(window.liseuseBack && window.liseuseBack()) ? 1 : 0", null);
     }
 
@@ -134,7 +292,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
-        if (intent != null && intent.hasCategory(Intent.CATEGORY_HOME)) {
+        if (web != null && intent != null && intent.hasCategory(Intent.CATEGORY_HOME)) {
             web.evaluateJavascript("window.liseuseHome && window.liseuseHome()", null);
         }
     }
@@ -142,6 +300,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        if (web == null) return;
         web.onResume();
         hideSystemBars();
         if (System.currentTimeMillis() - lastCheck > CHECK_EVERY_MS) checkForUpdate();
@@ -149,7 +308,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onPause() {
-        web.onPause();
+        if (web != null) web.onPause();
         super.onPause();
     }
 
@@ -181,6 +340,7 @@ public class MainActivity extends Activity {
     }
 
     private void checkForUpdate() {
+        if (web == null) return;
         lastCheck = System.currentTimeMillis();
         store.checkUpdate(version -> runOnUiThread(() ->
                 web.evaluateJavascript("window.liseuseUpdateReady && window.liseuseUpdateReady(" + quote(version) + ")", null)));
@@ -226,22 +386,17 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void openHomeSettings() { open(new Intent(Settings.ACTION_HOME_SETTINGS)); }
 
-        /** Ouvre l'écran d'accueil d'origine (Samsung en priorité) sans changer celui par défaut. */
         @JavascriptInterface
-        public void openSamsungHome() {
-            Intent home = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME);
-            List<ResolveInfo> list = getPackageManager().queryIntentActivities(home, 0);
-            ResolveInfo pick = null;
-            for (ResolveInfo ri : list) {
-                String pkg = ri.activityInfo.packageName;
-                if (pkg.equals(getPackageName())) continue;
-                if (pkg.contains("sec.android.app.launcher")) { pick = ri; break; }
-                if (pick == null && !pkg.equals("com.android.settings")) pick = ri;
-            }
-            if (pick == null) { open(new Intent(Settings.ACTION_HOME_SETTINGS)); return; }
-            Intent i = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME);
-            i.setClassName(pick.activityInfo.packageName, pick.activityInfo.name);
-            open(i);
+        public void openSamsungHome() { runOnUiThread(MainActivity.this::goOtherHome); }
+
+        /** L'interface signale qu'elle s'est bien affichée : on annule l'écran de secours. */
+        @JavascriptInterface
+        public void ready() {
+            ready = true;
+            runOnUiThread(() -> {
+                handler.removeCallbacks(watchdog);
+                if (rescue != null) rescue.setVisibility(View.GONE);
+            });
         }
 
         @JavascriptInterface

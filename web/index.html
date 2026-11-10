@@ -1379,7 +1379,7 @@ async function tick() {
 tick(); setInterval(tick, 20000);
 
 /* ================= démarrage ================= */
-(async () => { await DB.open(); await refresh(); })();
+(async () => { await Promise.race([DB.open(), sleep(4000)]); await refresh(); call("ready"); })();
 window.__liseuse = { DB, R, openReader, refresh, works: () => works, openAdmin };
 })();
 </script>
