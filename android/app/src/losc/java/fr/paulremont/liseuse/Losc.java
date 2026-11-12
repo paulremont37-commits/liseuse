@@ -526,6 +526,7 @@ final class Losc {
             put(x, "n", pl.isNull("number") ? 0 : pl.optInt("number"));
             put(x, "name", pl.optString("name"));
             put(x, "pos", pl.isNull("pos") ? "" : pl.optString("pos"));
+            put(x, "grid", pl.isNull("grid") ? "" : pl.optString("grid"));
             out.put(x);
         }
         return out;
