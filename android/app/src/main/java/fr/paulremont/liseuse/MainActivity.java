@@ -106,7 +106,10 @@ public class MainActivity extends Activity {
             @Override
             public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
                 Uri u = request.getUrl();
-                if (HOST.equals(u.getHost())) return store.serve(u.getPath());
+                if (HOST.equals(u.getHost())) {
+                    if ("/__net".equals(u.getPath())) return Net.serve(MainActivity.this, u);
+                    return store.serve(u.getPath());
+                }
                 return null;
             }
 

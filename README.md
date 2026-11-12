@@ -5,6 +5,7 @@ Transforme une tablette Android (Galaxy Tab S7 FE) en liseuse de mangas, BD, web
 - Formats : CBZ, ZIP, PDF, EPUB, images (JPG, PNG, WEBP).
 - Tout est stocké sur la tablette et se lit hors ligne. Aucun manga n'est fourni.
 - L'interface se met à jour toute seule depuis ce repo.
+- Extensions perso : un fichier `.js` sur GitHub ajoute une source en ligne au catalogue (lecture en ligne ou téléchargement). Voir [extensions/README.md](extensions/README.md).
 
 ## Installer sur la tablette
 

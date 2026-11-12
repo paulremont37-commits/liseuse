@@ -162,6 +162,37 @@ button{cursor:pointer}
 .source p{margin:0;color:var(--muted)}
 .source .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto;padding-top:6px}
 .pill{align-self:flex-start;font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;background:var(--surface-2);color:var(--muted)}
+.xsrc .xhead{display:flex;gap:12px;align-items:center;min-width:0}
+.xsrc .xhead > div{min-width:0}.xsrc .xhead small{color:var(--muted);font-size:12.5px}
+.xico{position:relative;width:46px;height:46px;flex:none;border-radius:13px;overflow:hidden;display:grid;place-items:center;background:hsl(var(--h) 55% 46%);color:#fff;font-family:var(--f-display);font-weight:800;font-size:22px}
+.xico img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.xadd{border-style:dashed}
+.xadd .pill{display:inline-flex;align-items:center;gap:6px}.xadd .pill svg{width:14px;height:14px}
+.xform{display:flex;gap:8px;flex-wrap:wrap}
+.xform input{flex:1 1 200px;min-width:0;height:44px;border:1px solid var(--line);background:var(--bg);color:var(--fg);border-radius:14px;padding:0 12px;font:inherit}
+.xerrline{color:var(--danger);font-size:13.5px;min-height:0}.xerrline:empty{display:none}
+.xh{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.xcover{background:linear-gradient(160deg,hsl(var(--h) 45% 38%),hsl(calc(var(--h) + 40) 50% 22%))}
+.xcover .xt{position:absolute;inset:auto 10px 12px 10px;color:#fff;font-family:var(--f-display);font-weight:800;font-size:15px;line-height:1.15;overflow-wrap:anywhere}
+.xcover img{position:relative;z-index:1}
+.xload{margin-top:22px}
+.xerr{display:flex;flex-direction:column;gap:6px;align-items:flex-start;margin-top:18px;padding:16px;border-radius:16px;background:color-mix(in srgb,var(--danger) 12%,var(--surface));border:1px solid color-mix(in srgb,var(--danger) 35%,transparent)}
+.xerr span{color:var(--muted);font-size:14px;overflow-wrap:anywhere}
+.xmore{display:flex;justify-content:center;margin:26px 0 10px}
+.xh2{font-family:var(--f-display);font-size:26px;letter-spacing:-.03em;margin:0 0 10px;line-height:1.1;overflow-wrap:anywhere}
+.xdesc{color:var(--muted);font-size:14px;margin:12px 0 0;max-height:9.5em;overflow:auto}
+.xchs{display:flex;flex-direction:column;margin-top:18px;border-top:1px solid var(--line)}
+.xch{display:flex;align-items:center;gap:8px;padding:10px 2px;border-bottom:1px solid var(--line)}
+.xch .xc{flex:1;min-width:0;display:flex;flex-direction:column}
+.xch .xc b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.xch .xc small{color:var(--muted);font-size:12.5px}
+.xch.read .xc b{color:var(--muted)}
+.xch .btn{height:40px;padding:0 12px}.xch .btn svg{width:18px;height:18px}
+.xok{color:var(--livre);font-weight:600}
+.xprog:empty{display:none}.xprog{color:var(--accent)!important;font-weight:600}
+.xurl{overflow-wrap:anywhere;font-size:13px}
+.xlogh{margin:16px 0 6px;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.xlog{margin:0;max-height:180px;overflow:auto;background:var(--surface-2);border-radius:12px;padding:10px;font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere}
 .pill.on{background:color-mix(in srgb,var(--livre) 22%,transparent);color:var(--livre)}
 
 .settings{display:flex;flex-direction:column;gap:14px;max-width:760px}
@@ -356,6 +387,9 @@ const ICONS = {
   search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
   play: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l10-6.5z"/></svg>',
   folder: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
+  back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>',
+  download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>',
+  puzzle: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M10 4a2 2 0 0 1 4 0v2h4v4h-2a2 2 0 0 0 0 4h2v4h-4v-2a2 2 0 0 0-4 0v2H6v-4H4a2 2 0 0 1 0-4h2V6h4z"/></svg>',
   sparkle: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l2 6 6 2-6 2-2 6-2-6-6-2 6-2z"/></svg>'
 };
 
@@ -365,7 +399,7 @@ const KINDS = {
   webtoon: { label: "Webtoon", plural: "Webtoons", c: "var(--webtoon)" },
   livre:   { label: "Livre",   plural: "Livres",   c: "var(--livre)" }
 };
-const FORMAT_LABEL = { cbz: "CBZ / ZIP", pdf: "PDF", epub: "EPUB", images: "Images", demo: "Exemple généré" };
+const FORMAT_LABEL = { cbz: "CBZ / ZIP", pdf: "PDF", epub: "EPUB", images: "Images", demo: "Exemple généré", ext: "En ligne (extension)" };
 
 function toast(msg, ms = 2600) {
   const t = document.createElement("div");
@@ -655,6 +689,7 @@ async function openPages(work) {
   if (work.format === "demo") {
     return { count: work.pages, async url(i) { if (cache.has(i)) return cache.get(i); const c = drawDemoPage(work.demo, i); const b = await new Promise(r => c.toBlob(r, "image/jpeg", 0.9)); return remember(i, URL.createObjectURL(b)); }, close: closeAll };
   }
+  if (work.format === "ext") return extPages(work);
   const data = await DB.getFile(work.id);
   if (!data) throw new Error("Fichier introuvable sur cet appareil.");
   if (work.format === "images") {
@@ -748,7 +783,7 @@ async function doImport() {
   if (ok) toast(ok > 1 ? `${ok} titres ajoutés.` : "Titre ajouté.");
 }
 async function importOne(p) {
-  const id = uid(); const w = { id, title: p.title, kind: p.kind, format: p.format, cover: "", pages: 0, addedAt: Date.now(), lastReadAt: 0, progress: null, done: false, mode: null };
+  const id = uid(); const w = { id, title: p.title, kind: p.kind, format: p.format, cover: "", pages: 0, addedAt: Date.now(), lastReadAt: 0, progress: null, done: false, mode: null, ...(p.extra || {}) };
   const f = p.files[0];
   if (p.format === "cbz") {
     await needZip(); const zip = await JSZip.loadAsync(f); const names = zipImages(zip);
@@ -777,7 +812,387 @@ async function importOne(p) {
     await DB.putFile(id, f);
   } else throw new Error("format non pris en charge");
   await DB.putWork(w);
+  return w;
 }
+
+/* ================= extensions perso ================= */
+// Une extension = un fichier .js hébergé (GitHub…) qui appelle liseuse.register({...}).
+// Elle tourne isolée dans un cadre sandbox : elle ne voit ni la bibliothèque ni la coque Android,
+// et passe par liseuse.http() pour ses requêtes.
+const netUrl = (url, headers) => {
+  const q = new URLSearchParams({ u: url });
+  if (headers && Object.keys(headers).length) q.set("h", JSON.stringify(headers));
+  return "/__net?" + q;
+};
+async function netFetch(url, opt = {}, as = "text") {
+  if (!/^https?:\/\//i.test(url || "")) throw new Error("adresse invalide : " + url);
+  const headers = opt.headers || {}, method = (opt.method || "GET").toUpperCase();
+  const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 45000);
+  try {
+    let r, status, finalUrl = url;
+    if (AND) {
+      const q = new URLSearchParams({ u: url, m: method });
+      if (Object.keys(headers).length) q.set("h", JSON.stringify(headers));
+      if (opt.body != null) q.set("b", String(opt.body));
+      r = await fetch("/__net?" + q, { signal: ctl.signal });
+      status = +(r.headers.get("X-Status") || r.status);
+      if (!status) throw new Error(r.headers.get("X-Error") || "pas de connexion");
+      finalUrl = r.headers.get("X-Final-Url") || url;
+    } else {
+      r = await fetch(url, { method, headers, body: opt.body == null ? undefined : String(opt.body), signal: ctl.signal });
+      status = r.status; finalUrl = r.url || url;
+    }
+    return { status, url: finalUrl, type: r.headers.get("Content-Type") || "", body: as === "blob" ? await r.blob() : await r.text() };
+  } catch (e) {
+    if (e.name === "AbortError") throw new Error("le site met trop de temps à répondre");
+    throw e;
+  } finally { clearTimeout(tm); }
+}
+const imgSrc = (url, headers) => !url ? "" : /^(data|blob):/.test(url) ? url : AND ? netUrl(url, headers) : url;
+
+const SANDBOX = `<!doctype html><meta charset="utf-8"><script>
+(() => {
+  const waits = new Map(); let seq = 0, def = null;
+  const post = m => parent.postMessage(Object.assign({ __lx: 1 }, m), "*");
+  const rpc = (type, data) => new Promise((res, rej) => { const id = ++seq; waits.set(id, { res, rej }); post({ type, id, data }); });
+  const plain = v => JSON.parse(JSON.stringify(v === undefined ? null : v));
+  window.liseuse = {
+    register(d) {
+      if (!d || typeof d !== "object") throw new Error("register() attend un objet");
+      def = d;
+      post({ type: "register", data: plain({ id: d.id, name: d.name, version: d.version, lang: d.lang, icon: d.icon, site: d.site, kind: d.kind, headers: d.headers, description: d.description,
+        methods: Object.keys(d).filter(k => typeof d[k] === "function") }) });
+    },
+    async http(url, opts) {
+      opts = opts || {};
+      const r = await rpc("http", { url: String(url), method: opts.method || "GET", headers: opts.headers || {}, body: opts.body == null ? null : String(opts.body) });
+      return { status: r.status, ok: r.status >= 200 && r.status < 300, url: r.url, text: async () => r.text, json: async () => JSON.parse(r.text) };
+    },
+    html(text, base) { const d = new DOMParser().parseFromString(String(text), "text/html"); if (base) { const b = d.createElement("base"); b.href = base; d.head.prepend(b); } return d; },
+    log(...a) { post({ type: "log", data: a.map(x => typeof x === "string" ? x : JSON.stringify(x)).join(" ") }); }
+  };
+  addEventListener("error", e => post({ type: "error", data: String(e.message || e) }));
+  addEventListener("unhandledrejection", e => post({ type: "error", data: String((e.reason && e.reason.message) || e.reason) }));
+  addEventListener("message", async e => {
+    const m = e.data; if (!m || !m.__lx || e.source !== parent) return;
+    if (m.type === "reply") { const w = waits.get(m.id); if (w) { waits.delete(m.id); m.error ? w.rej(new Error(m.error)) : w.res(m.data); } return; }
+    if (m.type === "load") {
+      try { (0, eval)(m.code + "\\n//# sourceURL=extension.js"); if (!def) throw new Error("le fichier n'appelle pas liseuse.register({...})"); }
+      catch (err) { post({ type: "fail", data: String(err && err.message || err) }); }
+      return;
+    }
+    if (m.type === "call") {
+      try {
+        if (!def || typeof def[m.method] !== "function") throw new Error("l'extension n'a pas de fonction « " + m.method + " »");
+        post({ type: "result", id: m.id, data: plain(await def[m.method](...(m.args || []))) });
+      } catch (err) { post({ type: "result", id: m.id, error: String(err && err.message || err) }); }
+    }
+  });
+  post({ type: "ready" });
+})();
+<\/script>`;
+
+const EXT = {
+  list: [], frames: new Map(), logs: new Map(),
+  async load() { try { const v = await DB.getFile("__extensions"); this.list = Array.isArray(v) ? v : []; } catch (e) { this.list = []; } },
+  async save() { await DB.putFile("__extensions", this.list); },
+  get(id) { return this.list.find(x => x.id === id) || null; },
+  log(id, msg) { const l = this.logs.get(id) || []; l.push(`${new Date().toLocaleTimeString("fr-FR")} ${msg}`); this.logs.set(id, l.slice(-30)); },
+  /** Lance le code dans un cadre isolé ; résout quand l'extension s'est enregistrée. */
+  spawn(code, logId) {
+    return new Promise((resolve, reject) => {
+      const fr = document.createElement("iframe");
+      fr.setAttribute("sandbox", "allow-scripts"); fr.hidden = true; fr.srcdoc = SANDBOX;
+      const calls = new Map(); let seq = 0, meta = null, done = false;
+      const h = {
+        get meta() { return meta; },
+        call(method, ...args) {
+          return new Promise((res, rej) => {
+            const id = ++seq; const t = setTimeout(() => { calls.delete(id); rej(new Error("l'extension ne répond pas (" + method + ")")); }, 60000);
+            calls.set(id, { res: v => { clearTimeout(t); res(v); }, rej: e => { clearTimeout(t); rej(e); } });
+            fr.contentWindow.postMessage({ __lx: 1, type: "call", id, method, args }, "*");
+          });
+        },
+        destroy() { removeEventListener("message", onMsg); fr.remove(); calls.forEach(c => c.rej(new Error("extension arrêtée"))); calls.clear(); }
+      };
+      const fail = msg => { if (done) return; done = true; h.destroy(); reject(new Error(msg)); };
+      const timer = setTimeout(() => fail("le fichier ne s'est pas enregistré (liseuse.register manquant ?)"), 10000);
+      const reply = (id, data, error) => fr.contentWindow.postMessage({ __lx: 1, type: "reply", id, data, error }, "*");
+      const onMsg = async e => {
+        if (e.source !== fr.contentWindow) return;
+        const m = e.data; if (!m || !m.__lx) return;
+        if (m.type === "ready") fr.contentWindow.postMessage({ __lx: 1, type: "load", code }, "*");
+        else if (m.type === "register") {
+          const d = m.data || {};
+          if (!/^[a-z0-9][a-z0-9._-]{1,59}$/i.test(d.id || "")) return fail("id manquant ou invalide (lettres, chiffres, . _ -)");
+          if (!d.name) return fail("name manquant");
+          if (!(d.methods || []).some(k => k === "popular" || k === "latest" || k === "search")) return fail("il faut au moins une fonction popular, latest ou search");
+          if (!(d.methods || []).includes("details")) return fail("la fonction details manque");
+          meta = { id: d.id, name: String(d.name).slice(0, 60), version: String(d.version || "1"), lang: d.lang || "", icon: d.icon || "", site: d.site || "", kind: KINDS[d.kind] ? d.kind : "manga",
+            headers: d.headers && typeof d.headers === "object" ? d.headers : {}, description: String(d.description || "").slice(0, 300), methods: d.methods };
+          if (!done) { done = true; clearTimeout(timer); resolve(h); }
+        }
+        else if (m.type === "fail") fail(m.data);
+        else if (m.type === "error" || m.type === "log") { if (logId) EXT.log(logId, (m.type === "error" ? "Erreur : " : "") + m.data); if (m.type === "error") console.warn("[extension]", m.data); }
+        else if (m.type === "result") { const c = calls.get(m.id); if (c) { calls.delete(m.id); m.error ? c.rej(new Error(m.error)) : c.res(m.data); } }
+        else if (m.type === "http") {
+          try { const r = await netFetch(m.data.url, m.data, "text"); reply(m.id, { status: r.status, url: r.url, text: r.body }); }
+          catch (err) { reply(m.id, null, err.message || String(err)); }
+        }
+      };
+      addEventListener("message", onMsg);
+      document.body.appendChild(fr);
+    });
+  },
+  async handle(id) {
+    if (this.frames.has(id)) return this.frames.get(id);
+    const x = this.get(id); if (!x) throw new Error("extension introuvable");
+    const p = this.spawn(x.code, id).catch(e => { this.frames.delete(id); throw e; });
+    this.frames.set(id, p); return p;
+  },
+  async call(id, method, ...args) {
+    const h = await this.handle(id);
+    try { return await h.call(method, ...args); }
+    catch (e) { this.log(id, `${method} : ${e.message}`); throw e; }
+  },
+  stop(id) { const p = this.frames.get(id); if (p) { this.frames.delete(id); p.then(h => h.destroy()).catch(() => {}); } },
+  rawUrl(u) {
+    u = u.trim();
+    let m = u.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/(?:blob|raw)\/(.+)$/i);
+    if (m) return `https://raw.githubusercontent.com/${m[1]}/${m[2]}/${m[3]}`;
+    return u;
+  },
+  /** Télécharge, vérifie et installe (ou remplace) une extension depuis son lien. */
+  async install(link, quiet) {
+    const url = this.rawUrl(link);
+    if (!/^https?:\/\//i.test(url)) throw new Error("colle un lien qui commence par https://");
+    const r = await netFetch(url + (url.includes("?") ? "&" : "?") + "t=" + Date.now(), {}, "text");
+    if (r.status !== 200) throw new Error(`le lien répond ${r.status}`);
+    const code = r.body;
+    if (/^\s*</.test(code)) throw new Error("le lien renvoie une page web, pas un fichier .js (sur GitHub, utilise le bouton Raw)");
+    if (code.length > 1.5e6) throw new Error("fichier trop gros");
+    const h = await this.spawn(code); const meta = h.meta; h.destroy();
+    const old = this.get(meta.id);
+    const entry = { ...meta, url, code, installedAt: old ? old.installedAt : Date.now(), updatedAt: Date.now(), checkedAt: Date.now() };
+    this.list = old ? this.list.map(x => x.id === meta.id ? entry : x) : [...this.list, entry];
+    this.stop(meta.id); await this.save();
+    return { entry, old };
+  },
+  async autoUpdate() {
+    for (const x of [...this.list]) {
+      if (!x.url || Date.now() - (x.checkedAt || 0) < 6 * 3600e3) continue;
+      try {
+        const r = await netFetch(x.url + (x.url.includes("?") ? "&" : "?") + "t=" + Date.now(), {}, "text");
+        x.checkedAt = Date.now();
+        if (r.status === 200 && r.body !== x.code) {
+          const { entry } = await this.install(x.url, true);
+          toast(`Extension « ${entry.name} » mise à jour (v${entry.version}).`, 3500);
+        } else await this.save();
+      } catch (e) { this.log(x.id, "mise à jour : " + e.message); }
+    }
+  }
+};
+
+/* ---- parcourir une source ---- */
+let B = null;   // { id, mode, query, page, items, more, loading, error }
+let X = null;   // fiche ouverte : { id, item, info, cover }
+const listOf = r => Array.isArray(r) ? { items: r, more: false } : { items: (r && r.items) || [], more: !!(r && r.more) };
+const normItem = it => it && it.id != null ? { id: String(it.id), title: String(it.title || "Sans titre"), cover: it.cover || "", subtitle: it.subtitle || "", url: it.url || "" } : null;
+async function browse(id, mode, query) {
+  const x = EXT.get(id); if (!x) return;
+  if (!mode) mode = x.methods.includes("popular") ? "popular" : x.methods.includes("latest") ? "latest" : "search";
+  B = { id, mode, query: query || "", page: 1, items: [], more: false, loading: true, error: "" };
+  S.tab = "catalog"; render(); $("#main").scrollTop = 0;
+  await browseMore(true);
+}
+async function browseMore(first) {
+  const b = B; if (!b) return;
+  if (b.mode === "search" && !b.query) { b.loading = false; render(); return; }
+  b.loading = true; if (!first) render();
+  try {
+    const r = listOf(b.mode === "search" ? await EXT.call(b.id, "search", b.query, b.page) : await EXT.call(b.id, b.mode, b.page));
+    if (B !== b) return;
+    const seen = new Set(b.items.map(i => i.id));
+    b.items.push(...r.items.map(normItem).filter(i => i && !seen.has(i.id)));
+    b.more = r.more && r.items.length > 0; b.page++; b.error = "";
+  } catch (e) { if (B !== b) return; b.error = e.message || String(e); }
+  b.loading = false; render();
+}
+function viewBrowse() {
+  const x = EXT.get(B.id); if (!x) { B = null; return viewCatalog(); }
+  const has = k => x.methods.includes(k);
+  const tabs = [has("popular") && ["popular", "Populaires"], has("latest") && ["latest", "Récents"]].filter(Boolean);
+  const kind = KINDS[x.kind] || KINDS.manga;
+  return `<div class="topbar"><button class="btn ghost" data-act="x-back" aria-label="Retour au catalogue">${ICONS.back}</button><h1 class="xh">${esc(x.name)}</h1>
+    ${has("search") ? `<form class="search" id="xsForm" role="search">${ICONS.search}<input id="xq" type="search" enterkeyhint="search" placeholder="Rechercher dans ${esc(x.name)}" value="${esc(B.query)}" aria-label="Rechercher"></form>` : ""}</div>
+    ${tabs.length > 1 || (tabs.length && B.mode === "search") ? `<div class="chips">${tabs.map(([k, l]) => `<button class="chip" data-xmode="${k}" aria-pressed="${B.mode === k}">${l}</button>`).join("")}${B.mode === "search" ? `<button class="chip" aria-pressed="true">Recherche : ${esc(B.query)}</button>` : ""}</div>` : ""}
+    ${B.items.length ? `<div class="grid">${B.items.map((it, i) => `<button class="card" data-xitem="${i}" aria-label="${esc(it.title)}">
+      <div class="cover xcover" style="--h:${hashHue(it.title)}">${it.cover ? `<img src="${esc(imgSrc(it.cover, x.headers))}" alt="" loading="lazy" onerror="this.remove()">` : ""}<span class="xt">${esc(it.title)}</span>
+        <span class="tag" style="--c:${kind.c}">${kind.label}</span></div>
+      <div class="t">${esc(it.title)}</div>${it.subtitle ? `<div class="m">${esc(it.subtitle)}</div>` : ""}</button>`).join("")}</div>` : ""}
+    ${B.loading ? `<p class="note xload">Chargement…</p>` : B.error ? `<div class="xerr"><b>L'extension a renvoyé une erreur</b><span>${esc(B.error)}</span><button class="btn" data-act="x-retry">Réessayer</button></div>`
+      : !B.items.length ? `<p class="note" style="margin-top:20px">${B.mode === "search" && !B.query ? "Tape ta recherche ci-dessus." : "Aucun résultat."}</p>`
+      : B.more ? `<div class="xmore"><button class="btn" data-act="x-more">Charger la suite</button></div>` : ""}`;
+}
+const workKey = (id, item, ch) => `${id}|${item.id}|${ch.id}`;
+const chDate = d => { if (!d) return ""; const t = typeof d === "number" ? d : Date.parse(d); return isNaN(t) ? String(d) : new Date(t).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" }); };
+async function openExtItem(i) {
+  const x = EXT.get(B.id); const item = B.items[i]; if (!x || !item) return;
+  X = { id: x.id, item, info: null, cover: "" };
+  openSheet(`<h2>${esc(item.title)}</h2><p class="sub">Chargement de la fiche…</p>`);
+  try {
+    const d = await EXT.call(x.id, "details", item);
+    if (!X || X.item !== item) return;
+    const chs = Array.isArray(d && d.chapters) ? d.chapters.filter(c => c && c.id != null).map(c => ({ ...c, id: String(c.id), title: String(c.title || (c.number != null ? "Chapitre " + c.number : "Chapitre")) })) : [];
+    X.info = { title: (d && d.title) || item.title, cover: (d && d.cover) || item.cover, author: (d && d.author) || "", description: (d && d.description) || "", status: (d && d.status) || "",
+      kind: d && KINDS[d.kind] ? d.kind : x.kind, chapters: chs };
+    renderExtItem();
+  } catch (e) {
+    if (!X || X.item !== item) return;
+    openSheet(`<h2>${esc(item.title)}</h2><div class="xerr"><b>Impossible d'ouvrir la fiche</b><span>${esc(e.message)}</span></div><div class="foot"><button class="btn" data-act="close">Fermer</button></div>`);
+  }
+}
+function renderExtItem() {
+  const x = EXT.get(X.id), d = X.info; if (!x || !d) return;
+  const keep = $("#sheetRoot .sheet"); const top = keep ? keep.scrollTop : 0;
+  const rows = d.chapters.map((c, i) => {
+    const w = works.find(w => w.srcKey === workKey(x.id, X.item, c));
+    const state = !w ? "" : w.format !== "ext" ? `<span class="xok">Téléchargé</span>` : w.done ? `<span class="xok">Lu</span>` : w.progress ? `<span>${pct(w)} %</span>` : "";
+    return `<div class="xch${w && w.done ? " read" : ""}"><div class="xc"><b>${esc(c.title)}</b><small>${[chDate(c.date), c.file ? "Fichier " + esc((c.format || "").toUpperCase()) : ""].filter(Boolean).join(" · ")}${state ? " · " + state : ""}</small><small class="xprog" id="xp${i}"></small></div>
+      ${w && w.format !== "ext" ? `<button class="btn primary" data-read="${w.id}">${ICONS.play} Lire</button>` : `
+      ${c.file ? "" : `<button class="btn" data-xread="${i}">${ICONS.play} Lire</button>`}
+      <button class="btn ${c.file ? "primary" : ""}" data-xdl="${i}" aria-label="Télécharger ${esc(c.title)}">${ICONS.download}${c.file ? " Ajouter" : ""}</button>`}</div>`;
+  }).join("");
+  openSheet(`<div class="detail">
+    <div class="cover xcover" style="--h:${hashHue(d.title)}">${d.cover ? `<img src="${esc(imgSrc(d.cover, x.headers))}" alt="" onerror="this.remove()">` : ""}<span class="xt">${esc(d.title)}</span></div>
+    <div style="min-width:0"><h2 class="xh2">${esc(d.title)}</h2>
+      <dl class="kv">${d.author ? `<dt>Auteur</dt><dd>${esc(d.author)}</dd>` : ""}<dt>Source</dt><dd>${esc(x.name)}</dd>${d.status ? `<dt>Statut</dt><dd>${esc(d.status)}</dd>` : ""}<dt>Contenu</dt><dd>${d.chapters.length} chapitre${d.chapters.length > 1 ? "s" : ""}</dd></dl>
+      ${d.description ? `<p class="xdesc">${esc(String(d.description).slice(0, 1200))}</p>` : ""}</div></div>
+    <div class="xchs">${rows || `<p class="note">Aucun chapitre.</p>`}</div>
+    <div class="foot">${d.chapters.length > 1 ? `<button class="btn" data-act="x-dlall">${ICONS.download} Tout télécharger</button>` : ""}<button class="btn" data-act="close">Fermer</button></div>`);
+  const s = $("#sheetRoot .sheet"); if (s) s.scrollTop = top;
+}
+async function seriesCover(x, d) {
+  if (X && X.cover) return X.cover;
+  let c = "";
+  if (d.cover) { try { const r = await netFetch(d.cover, { headers: x.headers }, "blob"); if (r.status < 300 && /^image\//.test(r.body.type || r.type)) c = await coverFromBlob(r.body); } catch (e) {} }
+  c = c || textCover(d.title, d.kind);
+  if (X) X.cover = c; return c;
+}
+async function extWork(i) {
+  const x = EXT.get(X.id), d = X.info, c = d.chapters[i], key = workKey(x.id, X.item, c);
+  let w = works.find(w => w.srcKey === key); if (w) return w;
+  w = { id: uid(), title: d.chapters.length > 1 ? `${d.title} · ${c.title}` : d.title, kind: d.kind, format: "ext", cover: await seriesCover(x, d), pages: 0,
+    addedAt: Date.now(), lastReadAt: 0, progress: null, done: false, mode: null, srcKey: key,
+    src: { ext: x.id, item: X.item, chapter: c, series: d.title } };
+  await DB.putWork(w); works.push(w); return w;
+}
+const pageMemo = new Map();
+async function readExt(i) {
+  const x = EXT.get(X.id), c = X.info.chapters[i], key = workKey(x.id, X.item, c);
+  if (!works.some(w => w.srcKey === key)) {
+    // On vérifie le chapitre avant de l'ajouter à la bibliothèque
+    const pages = normPages(await EXT.call(x.id, "pages", c, X.item));
+    if (!pages.length) throw new Error("L'extension n'a renvoyé aucune page pour ce chapitre.");
+    pageMemo.set(key, pages);
+  }
+  const w = await extWork(i); openReader(w.id);
+}
+const normPages = list => (Array.isArray(list) ? list : []).map(p => typeof p === "string" ? { url: p, headers: {} } : p && p.url ? { url: String(p.url), headers: p.headers || {} } : null).filter(Boolean);
+async function fetchPageBlob(x, p) {
+  const r = await netFetch(p.url, { headers: { ...(x.headers || {}), ...p.headers } }, "blob");
+  if (r.status >= 300) throw new Error(`page refusée (${r.status})`);
+  const b = r.body; return b.type ? b : new Blob([b], { type: "image/jpeg" });
+}
+/** Télécharge un chapitre dans la bibliothèque (lecture hors ligne). */
+async function dlExt(i, quiet) {
+  const x = EXT.get(X.id), d = X.info, c = d.chapters[i], key = workKey(x.id, X.item, c);
+  const prog = t => { const el = $("#xp" + i); if (el) el.textContent = t; };
+  const ex = works.find(w => w.srcKey === key);
+  if (ex && ex.format !== "ext") return ex;
+  prog("Préparation…");
+  if (c.file) {
+    const r = await netFetch(c.file, { headers: x.headers }, "blob");
+    if (r.status >= 300) throw new Error(`fichier refusé (${r.status})`);
+    let fmt = (c.format || "").toLowerCase().replace("zip", "cbz");
+    if (!["epub", "pdf", "cbz"].includes(fmt)) { const m = (r.url || c.file).toLowerCase().match(/\.(epub|pdf|cbz|zip)\b/); fmt = m ? m[1].replace("zip", "cbz") : ""; }
+    if (!fmt) throw new Error("format du fichier inconnu (indique format: \"epub\", \"pdf\" ou \"cbz\")");
+    const file = new File([r.body], `${d.title}.${fmt}`, { type: r.body.type });
+    prog("Ajout…");
+    const w = await importOne({ files: [file], title: d.chapters.length > 1 ? `${d.title} · ${c.title}` : d.title, kind: fmt === "epub" ? "livre" : d.kind, format: fmt,
+      extra: { srcKey: key, src: { ext: x.id, item: X.item, chapter: c, series: d.title } } });
+    if (fmt !== "epub") { try { w.cover = await seriesCover(x, d); await DB.putWork(w); } catch (e) {} }
+    prog(""); await refresh(); return w;
+  }
+  const pages = normPages(await EXT.call(x.id, "pages", c, X.item));
+  if (!pages.length) throw new Error("aucune page renvoyée");
+  const blobs = new Array(pages.length); let n = 0, k = 0;
+  const worker = async () => { while (k < pages.length) { const j = k++; blobs[j] = await fetchPageBlob(x, pages[j]); n++; prog(`${n} / ${pages.length} pages`); } };
+  await Promise.all(Array.from({ length: Math.min(4, pages.length) }, worker));
+  const cover = await seriesCover(x, d);
+  const w = ex || { id: uid(), addedAt: Date.now(), lastReadAt: 0, progress: null, done: false, mode: null };
+  Object.assign(w, { title: d.chapters.length > 1 ? `${d.title} · ${c.title}` : d.title, kind: d.kind, format: "images", cover, pages: blobs.length, srcKey: key,
+    src: { ext: x.id, item: X.item, chapter: c, series: d.title } });
+  await DB.putFile(w.id, { blobs }); await DB.putWork(w);
+  prog(""); await refresh(); return w;
+}
+async function dlExtUI(i) {
+  try { await dlExt(i); if (X && X.info) renderExtItem(); toast("Chapitre téléchargé : il se lit maintenant sans connexion."); }
+  catch (e) { const el = $("#xp" + i); if (el) el.textContent = ""; toast("Téléchargement impossible : " + (e.message || e), 4500); }
+}
+async function dlAllUI() {
+  const d = X && X.info; if (!d) return; const todo = d.chapters.map((c, i) => i);
+  let ok = 0;
+  for (const i of todo) { try { await dlExt(i); ok++; } catch (e) { toast(`« ${d.chapters[i].title} » : ${e.message}`, 3500); } if (!X || X.info !== d) break; }
+  if (X && X.info === d) renderExtItem();
+  toast(`${ok} chapitre${ok > 1 ? "s" : ""} téléchargé${ok > 1 ? "s" : ""}.`);
+}
+/** Pages d'un titre lu en ligne via son extension. */
+async function extPages(work) {
+  const x = EXT.get(work.src.ext);
+  if (!x) throw new Error("L'extension de ce titre a été supprimée. Réinstalle-la depuis le catalogue.");
+  const pages = pageMemo.get(work.srcKey) || normPages(await EXT.call(x.id, "pages", work.src.chapter, work.src.item));
+  pageMemo.delete(work.srcKey);
+  const cache = new Map(), order = [];
+  return {
+    count: pages.length,
+    url(i) {
+      if (cache.has(i)) return cache.get(i);
+      const job = fetchPageBlob(x, pages[i]).then(b => URL.createObjectURL(b));
+      job.catch(() => cache.delete(i));
+      cache.set(i, job); order.push(i);
+      if (order.length > 24) { const old = order.shift(); const p = cache.get(old); cache.delete(old); if (p) p.then(u => URL.revokeObjectURL(u)).catch(() => {}); }
+      return job;
+    },
+    close() { cache.forEach(p => p.then(u => URL.revokeObjectURL(u)).catch(() => {})); cache.clear(); }
+  };
+}
+let xBusy = false;
+async function addExtFromField() {
+  const inp = $("#xUrl"); if (!inp || xBusy) return;
+  const link = inp.value.trim(); if (!link) { toast("Colle d'abord le lien de ton extension."); return; }
+  xBusy = true; const btn = $("[data-act=x-install]"); if (btn) { btn.disabled = true; btn.textContent = "Vérification…"; }
+  try {
+    const { entry, old } = await EXT.install(link);
+    toast(old ? `« ${entry.name} » mise à jour (v${entry.version}).` : `Extension « ${entry.name} » installée.`);
+    xBusy = false; render();
+  } catch (e) {
+    xBusy = false;
+    if (btn) { btn.disabled = false; btn.innerHTML = `${ICONS.plus} Installer`; }
+    const err = $("#xErr"); if (err) err.textContent = "Pas installée : " + (e.message || e);
+  }
+}
+function openExtInfo(id, confirmDel) {
+  const x = EXT.get(id); if (!x) return;
+  const logs = EXT.logs.get(id) || [];
+  openSheet(`<h2>${esc(x.name)}</h2><p class="sub">${esc(x.description || "Extension perso")}</p>
+    <dl class="kv"><dt>Version</dt><dd>${esc(x.version)}</dd><dt>Identifiant</dt><dd>${esc(x.id)}</dd>${x.lang ? `<dt>Langue</dt><dd>${esc(x.lang)}</dd>` : ""}${x.site ? `<dt>Site</dt><dd>${esc(x.site)}</dd>` : ""}
+      <dt>Lien</dt><dd class="xurl">${esc(x.url || "—")}</dd><dt>Vérifiée</dt><dd>${x.checkedAt ? ago(x.checkedAt) : "—"}</dd></dl>
+    ${logs.length ? `<h4 class="xlogh">Journal</h4><pre class="xlog">${esc(logs.join("\n"))}</pre>` : ""}
+    ${confirmDel ? `<div class="confirm"><span>Supprimer l'extension ? Les chapitres déjà téléchargés restent dans la bibliothèque.</span><button class="btn" data-xinfo="${esc(id)}">Garder</button><button class="btn danger solid" data-xrm="${esc(id)}">Supprimer</button></div>` : ""}
+    <div class="foot"><button class="btn danger" data-xrmask="${esc(id)}">Supprimer</button>${x.url ? `<button class="btn" data-xupd="${esc(id)}">Mettre à jour</button>` : ""}<button class="btn primary" data-xbrowse="${esc(id)}">Parcourir</button></div>`);
+}
+
 
 /* ================= état & rendu ================= */
 let works = [];
@@ -791,7 +1206,7 @@ function pct(w) {
 function where(w) {
   const p = w.progress;
   if (w.done) return "Terminé";
-  if (!p) return `${w.pages} ${isBook(w) ? "chapitre" : "page"}${w.pages > 1 ? "s" : ""}`;
+  if (!p) return w.format === "ext" && !w.pages ? "À lire en ligne" : `${w.pages} ${isBook(w) ? "chapitre" : "page"}${w.pages > 1 ? "s" : ""}`;
   if (p.ch !== undefined) return `Chapitre ${p.ch + 1} / ${w.pages}`;
   return `Page ${p.page + 1} / ${p.total || w.pages}`;
 }
@@ -811,7 +1226,7 @@ function render() {
   renderNav();
   const v = $("#view");
   if (S.tab === "history") v.innerHTML = viewHistory();
-  else if (S.tab === "catalog") v.innerHTML = viewCatalog();
+  else if (S.tab === "catalog") v.innerHTML = B ? viewBrowse() : viewCatalog();
   else if (S.tab === "settings") { v.innerHTML = viewSettings(); fillStorage(); }
   else v.innerHTML = viewLibrary();
 }
@@ -822,7 +1237,7 @@ function card(w) {
       <span class="tag" style="--c:${k.c}">${k.label}</span>
       ${w.done ? '<span class="done">Terminé</span>' : !w.progress ? '<span class="new">Nouveau</span>' : `<div class="bar"><i style="width:${p}%"></i></div>`}
     </div>
-    <div class="t">${esc(w.title)}</div><div class="m">${w.example ? "Exemple · " : ""}${where(w)}</div></button>`;
+    <div class="t">${esc(w.title)}</div><div class="m">${w.example ? "Exemple · " : w.format === "ext" ? "En ligne · " : ""}${where(w)}</div></button>`;
 }
 function viewLibrary() {
   const counts = { all: works.length }; for (const w of works) counts[w.kind] = (counts[w.kind] || 0) + 1;
@@ -862,10 +1277,18 @@ function viewCatalog() {
   <div class="sources">
     <div class="source"><span class="pill on">Disponible</span><h3>Cet appareil</h3><p>Ajoute des fichiers depuis la tablette : CBZ, ZIP, PDF, EPUB ou un dossier d'images.</p>
       <div class="actions"><button class="btn primary" data-act="pick">${ICONS.plus} Fichiers</button><button class="btn" data-act="pick-dir">${ICONS.folder} Dossier</button></div></div>
-    <div class="source"><span class="pill">Bientôt</span><h3>Komga · Kavita</h3><p>Ta collection rangée sur le Mac. Tu la parcours depuis la tablette et tu télécharges un tome en un tap pour le lire hors ligne.</p></div>
-    <div class="source"><span class="pill">Bientôt</span><h3>Catalogues OPDS</h3><p>Le format standard des bibliothèques numériques : médiathèques, boutiques sans DRM, ou ton propre serveur.</p></div>
-  </div>
-  <p class="note" style="margin-top:18px">Les sources en ligne arrivent dans une prochaine mise à jour, sans rien réinstaller.</p>`;
+    ${EXT.list.map(x => `<div class="source xsrc">
+      <div class="xhead"><span class="xico" style="--h:${hashHue(x.id)}">${x.icon ? `<img src="${esc(imgSrc(x.icon, x.headers))}" alt="" onerror="this.remove()">` : ""}<i>${esc(x.name.slice(0, 1).toUpperCase())}</i></span>
+        <div><h3>${esc(x.name)}</h3><small>Extension perso · v${esc(x.version)}${x.lang ? " · " + esc(x.lang) : ""}</small></div></div>
+      ${x.description ? `<p>${esc(x.description)}</p>` : ""}
+      <div class="actions"><button class="btn primary" data-xbrowse="${esc(x.id)}">Parcourir</button><button class="btn" data-xinfo="${esc(x.id)}">Gérer</button></div></div>`).join("")}
+    <div class="source xadd"><span class="pill">${ICONS.puzzle} Extension perso</span><h3>Ajouter une extension</h3>
+      <p>Colle le lien de ton fichier <code>.js</code> sur GitHub. L'appli le vérifie, l'installe et le met à jour toute seule quand tu le modifies.</p>
+      <form class="xform" id="xForm"><input id="xUrl" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://github.com/…/mon-extension.js" aria-label="Lien de l'extension">
+      <button class="btn primary" type="submit" data-act="x-install">${ICONS.plus} Installer</button></form>
+      <p class="xerrline" id="xErr" role="alert"></p>
+      <p class="note">Comment écrire une extension : voir le guide dans Réglages.</p></div>
+  </div>`;
 }
 function seg(key, opts) {
   return `<div class="seg" role="group">${opts.map(([v, l]) => `<button type="button" data-set="${key}" data-val="${v}" aria-pressed="${String(S[key]) === String(v)}">${l}</button>`).join("")}</div>`;
@@ -886,6 +1309,12 @@ function viewSettings() {
       <li><b>Webtoon</b> : fais simplement défiler vers le bas.</li></ul></div></details>
     <details><summary>Lire un livre</summary><div class="gbody">
       Tape à droite pour avancer, à gauche pour revenir. Au centre, le menu donne accès à la taille du texte, à la police et au fond (papier, sombre ou blanc). En paysage, le texte se met sur deux colonnes.</div></details>
+    <details><summary>Créer tes extensions</summary><div class="gbody">
+      Une extension est un fichier <b>.js</b> qui apprend à la liseuse à lire une source en ligne : catalogue, recherche, chapitres et pages.
+      <ol><li>Copie le modèle <code>extensions/modele.js</code> du repo et adapte-le à ta source.</li>
+      <li>Mets le fichier sur GitHub, puis colle son lien dans <b>Catalogue → Ajouter une extension</b>.</li>
+      <li>Quand tu modifies le fichier sur GitHub, la tablette récupère la nouvelle version toute seule (vérification toutes les 6 h, ou bouton <b>Mettre à jour</b>).</li></ol>
+      Les chapitres se lisent en ligne ou se téléchargent pour être lus sans connexion. Le mode d'emploi complet est dans <code>extensions/README.md</code>. Si une extension plante, le message s'affiche dans <b>Gérer</b> → Journal.</div></details>
     <details><summary>Ranger ta bibliothèque</summary><div class="gbody">
       <ul><li>Touche une couverture pour ouvrir sa <b>fiche</b> : renommer, changer le type ou le sens de lecture, recommencer, marquer comme lu, supprimer.</li>
       <li>Les filtres <b>Manga</b>, <b>BD</b>, <b>Webtoons</b>, <b>Livres</b>, la recherche et le tri sont en haut de la bibliothèque.</li>
@@ -1322,8 +1751,25 @@ document.addEventListener("click", async e => {
   if (st) { const key = st.dataset.set; S[key] = st.dataset.val; saveS(); if (key === "theme") applyTheme(); render(); return; }
   const tg = t.closest("[data-toggle]");
   if (tg) { S[tg.dataset.toggle] = !S[tg.dataset.toggle]; saveS(); render(); return; }
+  const xb = t.closest("[data-xbrowse]"); if (xb) { closeSheet(); browse(xb.dataset.xbrowse); return; }
+  const xi = t.closest("[data-xinfo]"); if (xi) { openExtInfo(xi.dataset.xinfo); return; }
+  const xra = t.closest("[data-xrmask]"); if (xra) { openExtInfo(xra.dataset.xrmask, true); return; }
+  const xrm = t.closest("[data-xrm]"); if (xrm) { const id = xrm.dataset.xrm; EXT.stop(id); EXT.list = EXT.list.filter(x => x.id !== id); await EXT.save(); closeSheet(); if (B && B.id === id) B = null; render(); toast("Extension supprimée."); return; }
+  const xu = t.closest("[data-xupd]");
+  if (xu) { const x = EXT.get(xu.dataset.xupd); if (!x) return; xu.disabled = true; xu.textContent = "Vérification…";
+    try { const old = x.version; const { entry } = await EXT.install(x.url); toast(entry.code === x.code ? "Déjà à jour." : `« ${entry.name} » mise à jour${entry.version !== old ? " (v" + entry.version + ")" : ""}.`); openExtInfo(entry.id); render(); }
+    catch (er) { toast("Mise à jour impossible : " + er.message, 4500); openExtInfo(x.id); } return; }
+  const xm = t.closest("[data-xmode]"); if (xm && B) { browse(B.id, xm.dataset.xmode); return; }
+  const xit = t.closest("[data-xitem]"); if (xit) { openExtItem(+xit.dataset.xitem); return; }
+  const xr = t.closest("[data-xread]"); if (xr) { xr.disabled = true; try { await readExt(+xr.dataset.xread); } catch (er) { toast("Lecture impossible : " + er.message, 4500); xr.disabled = false; } return; }
+  const xd = t.closest("[data-xdl]"); if (xd) { xd.disabled = true; await dlExtUI(+xd.dataset.xdl); xd.disabled = false; return; }
   const a = t.closest("[data-act]"); if (!a) return;
   const act = a.dataset.act;
+  if (act === "x-back") { B = null; render(); return; }
+  if (act === "x-more") { browseMore(); return; }
+  if (act === "x-retry") { B.error = ""; browseMore(); return; }
+  if (act === "x-dlall") { a.disabled = true; await dlAllUI(); return; }
+  if (act === "x-install") { e.preventDefault(); addExtFromField(); return; }
   if (act === "scrim" && t === a) { await saveTitleFromDetail(); closeSheet(); }
   else if (act === "close") { closeSheet(); }
   else if (act === "pick") $("#fileIn").click();
@@ -1344,6 +1790,10 @@ document.addEventListener("change", e => {
   if (e.target.id === "sort") { S.sort = e.target.value; saveS(); render(); }
   if (e.target.id === "bookSize") { S.bookSize = +e.target.value; saveS(); }
 });
+document.addEventListener("submit", e => {
+  if (e.target.id === "xForm") { e.preventDefault(); addExtFromField(); }
+  if (e.target.id === "xsForm") { e.preventDefault(); const q = $("#xq").value.trim(); if (q && B) browse(B.id, "search", q); }
+});
 document.addEventListener("focusout", e => { if (e.target.id === "dTitle") saveTitleFromDetail(); });
 $("#fileIn").addEventListener("change", e => { prepareImport(e.target.files); e.target.value = ""; });
 $("#dirIn").addEventListener("change", e => { prepareImport(e.target.files, true); e.target.value = ""; });
@@ -1355,6 +1805,7 @@ document.addEventListener("drop", e => { if (e.dataTransfer && e.dataTransfer.fi
 window.liseuseBack = () => {
   if (!reader.hidden) { if (!$("#rPanel").hidden) $("#rPanel").hidden = true; else closeReader(); return true; }
   if ($("#sheetRoot").innerHTML) { closeSheet(); return true; }
+  if (S.tab === "catalog" && B) { B = null; render(); return true; }
   if (S.tab !== "library") { S.tab = "library"; saveS(); render(); return true; }
   return false;
 };
@@ -1412,8 +1863,8 @@ async function tick() {
 tick(); setInterval(tick, 20000);
 
 /* ================= démarrage ================= */
-(async () => { await Promise.race([DB.open(), sleep(4000)]); await refresh(); call("ready"); })();
-window.__liseuse = { DB, R, openReader, refresh, works: () => works, openAdmin };
+(async () => { await Promise.race([DB.open(), sleep(4000)]); await EXT.load(); await refresh(); call("ready"); setTimeout(() => EXT.autoUpdate(), 4000); })();
+window.__liseuse = { DB, R, openReader, refresh, works: () => works, openAdmin, EXT };
 })();
 </script>
 </body>
