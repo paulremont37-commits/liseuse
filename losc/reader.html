@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Article</title>
+<style>
+@font-face{font-family:'Barlow Condensed';src:url(fonts/barlow-condensed-latin-800-italic.woff2) format('woff2');font-weight:800;font-style:italic;font-display:swap}
+@font-face{font-family:'Barlow Condensed';src:url(fonts/barlow-condensed-latin-900-italic.woff2) format('woff2');font-weight:900;font-style:italic;font-display:swap}
+@font-face{font-family:'Barlow Condensed';src:url(fonts/barlow-condensed-latin-800-normal.woff2) format('woff2');font-weight:800;font-style:normal;font-display:swap}
+@font-face{font-family:'Barlow';src:url(fonts/barlow-latin-400-normal.woff2) format('woff2');font-weight:400;font-display:swap}
+@font-face{font-family:'Barlow';src:url(fonts/barlow-latin-600-normal.woff2) format('woff2');font-weight:600;font-display:swap}
+@font-face{font-family:'Barlow';src:url(fonts/barlow-latin-700-normal.woff2) format('woff2');font-weight:700;font-display:swap}
+/* Mode lecture Dogues : le texte de l'article remis en page sur le papier du journal. */
+:root{
+  --abyss:#06102a; --navy:#0c1b3f; --red:#d6102a; --paper:#f1ebdf; --paper-2:#e6ddcc; --ink:#0c1b3f; --ink-2:#4b5676; --rule:#cdbfa6; --mist:#a9b6d6;
+  --f-cond:'Barlow Condensed','Arial Narrow',Impact,sans-serif; --f-body:'Barlow',system-ui,sans-serif;
+  --grain:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .5 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:19px;line-height:1.62;-webkit-tap-highlight-color:transparent}
+body::before{content:"";position:fixed;inset:0;background-image:var(--grain);opacity:.2;mix-blend-mode:multiply;pointer-events:none}
+.wrap{position:relative;max-width:700px;margin:0 auto;padding:26px max(20px,env(safe-area-inset-right,0px)) 60px max(20px,env(safe-area-inset-left,0px))}
+.claw{fill:currentColor}
+/* états */
+.state{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:14px;padding:30px;background:var(--abyss);color:#fff;position:relative;overflow:hidden}
+.state .big{position:absolute;width:300px;height:380px;right:-80px;top:-40px;color:var(--red);transform:rotate(6deg);opacity:.9}
+.state b{position:relative;font-family:var(--f-cond);font-style:italic;font-weight:900;font-size:40px;line-height:1;text-transform:uppercase}
+.state p{position:relative;margin:0;max-width:440px;color:var(--mist);font-size:16px;line-height:1.5}
+.state .claw-load{width:70px;height:70px;color:var(--red);position:relative;animation:scr 1.1s ease-in-out infinite}
+@keyframes scr{0%{clip-path:inset(0 0 100% 0)}60%,100%{clip-path:inset(0 0 0 0)}}
+.btn{position:relative;height:46px;border:0;background:#fff;color:var(--ink);padding:0 20px;font-family:var(--f-cond);font-style:italic;font-weight:900;font-size:18px;letter-spacing:.05em;text-transform:uppercase;clip-path:polygon(8px 0,100% 0,calc(100% - 8px) 100%,0 100%);cursor:pointer}
+.btn.red{background:var(--red);color:#fff}
+.btns{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:6px}
+/* article */
+.kick{display:inline-block;background:var(--red);color:#fff;font-family:var(--f-cond);font-style:italic;font-weight:900;font-size:14px;letter-spacing:.1em;text-transform:uppercase;padding:3px 12px;transform:skewX(-12deg)}
+.kick span{display:inline-block;transform:skewX(12deg)}
+h1{font-family:var(--f-cond);font-style:normal;font-weight:800;font-size:clamp(32px,6vw,44px);line-height:1.02;margin:14px 0 10px;text-wrap:balance}
+.by{font-size:14px;color:var(--ink-2);padding-bottom:16px;border-bottom:2px solid var(--ink);margin-bottom:22px}
+.by b{color:var(--ink);font-weight:600}
+.lead{width:100%;height:auto;display:block;margin:0 0 22px}
+.body p{margin:0 0 1.05em}
+.body h2,.body h3,.body h4{font-family:var(--f-cond);font-style:italic;font-weight:900;text-transform:uppercase;line-height:1.05;margin:1.6em 0 .5em}
+.body h2{font-size:28px}.body h3{font-size:23px}.body h4{font-size:20px}
+.body a{color:var(--red);text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px}
+.body img{max-width:100%;height:auto;display:block;margin:10px auto}
+.body figure{margin:1.4em 0}
+.body figcaption{font-size:14px;color:var(--ink-2);line-height:1.4;margin-top:6px}
+.body blockquote{margin:1.4em 0;padding:4px 0 4px 18px;border-left:5px solid var(--red);font-family:var(--f-cond);font-style:italic;font-weight:800;font-size:24px;line-height:1.2}
+.body ul,.body ol{padding-left:1.2em;margin:0 0 1.05em}
+.body li{margin:.3em 0}
+.body hr{border:0;border-top:1px solid var(--rule);margin:1.6em 0}
+.body table{border-collapse:collapse;width:100%;font-size:15px;margin:1em 0;display:block;overflow-x:auto}
+.body td,.body th{border-bottom:1px solid var(--rule);padding:6px 8px;text-align:left}
+.end{margin-top:34px;padding:18px;background:var(--navy);color:#fff;display:flex;gap:14px;align-items:center;flex-wrap:wrap;clip-path:polygon(0 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%)}
+.end p{margin:0;flex:1 1 220px;font-size:14.5px;line-height:1.45;color:var(--mist)}
+.end p b{color:#fff}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><symbol id="claw" viewBox="0 0 100 100">
+  <path d="M5 97 Q19 63 43 9 Q29 61 12 98 Z"/><path d="M25 99 Q41 58 67 2 Q51 57 32 100 Z"/><path d="M47 97 Q62 60 87 9 Q72 60 54 98 Z"/><path d="M69 93 Q80 70 97 37 Q86 68 75 94 Z"/>
+</symbol></defs></svg>
+<div id="root"></div>
+<script>
+(() => {
+"use strict";
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const A = window.Article || null;
+const big = `<svg class="big claw" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><use href="#claw"/></svg>`;
+const btnPage = `<button class="btn" data-act="page">Voir la page du média</button>`;
+const btnOut = `<button class="btn red" data-act="browser">Ouvrir dans le navigateur</button>`;
+
+window.state = (kind, msg) => {
+  const T = {
+    loading: ["Chargement", "On récupère l'article et on le remet en page, sans les pubs."],
+    consent: ["Une seconde", "Google demande ton choix pour les cookies. Accepte ou refuse, puis l'article se charge."],
+    paywall: ["Réservé aux abonnés", "Cet article est payant chez le média. Pour le lire, ouvre-le sur son site."],
+    fail: ["Texte introuvable", "Impossible d'isoler le texte de cette page. Tu peux l'afficher telle quelle."]
+  }[kind] || ["", ""];
+  $("#root").innerHTML = `<div class="state">${big}${kind === "loading" ? `<svg class="claw claw-load" viewBox="0 0 100 100" aria-hidden="true"><use href="#claw"/></svg>` : ""}
+    <b>${T[0]}</b><p>${esc(msg || T[1])}</p>${kind === "paywall" ? `<div class="btns">${btnOut}${btnPage}</div>` : kind === "fail" ? `<div class="btns">${btnPage}${btnOut}</div>` : ""}</div>`;
+  window.scrollTo(0, 0);
+};
+
+/* nettoyage : on ne garde que le texte et sa structure */
+const KEEP = new Set(["P", "H2", "H3", "H4", "H5", "H6", "UL", "OL", "LI", "BLOCKQUOTE", "FIGURE", "FIGCAPTION", "IMG", "A", "STRONG", "B", "EM", "I", "BR", "HR", "TABLE", "THEAD", "TBODY", "TR", "TD", "TH", "SPAN", "DIV", "SECTION", "ARTICLE", "PICTURE", "SUP", "SUB"]);
+const DROP = new Set(["SCRIPT", "STYLE", "IFRAME", "OBJECT", "EMBED", "FORM", "INPUT", "BUTTON", "SELECT", "TEXTAREA", "NOSCRIPT", "SVG", "VIDEO", "AUDIO", "CANVAS", "ASIDE", "NAV", "FOOTER", "HEADER", "SOURCE"]);
+function clean(html, base) {
+  const doc = new DOMParser().parseFromString(`<div>${html || ""}</div>`, "text/html");
+  const root = doc.body.firstElementChild;
+  const walk = el => {
+    for (const c of [...el.children]) {
+      if (DROP.has(c.tagName)) { c.remove(); continue; }
+      walk(c);
+      if (!KEEP.has(c.tagName)) { c.replaceWith(...c.childNodes); continue; }
+      const keep = {};
+      if (c.tagName === "A") { const h = c.getAttribute("href"); if (h && /^https?:/i.test(h)) keep.href = h; }
+      if (c.tagName === "IMG") {
+        const src = c.getAttribute("src") || c.getAttribute("data-src") || c.getAttribute("data-lazy-src") || "";
+        if (!/^https?:/i.test(src) || /pixel|tracking|1x1|spacer/i.test(src)) { c.remove(); continue; }
+        keep.src = src; keep.alt = c.getAttribute("alt") || ""; keep.loading = "lazy";
+      }
+      for (const a of [...c.attributes]) c.removeAttribute(a.name);
+      for (const [k, v] of Object.entries(keep)) c.setAttribute(k, v);
+    }
+  };
+  walk(root);
+  // paragraphes vides et doublons de l'image d'en-tête
+  root.querySelectorAll("p,div,span").forEach(n => { if (!n.textContent.trim() && !n.querySelector("img")) n.remove(); });
+  return root.innerHTML;
+}
+const ago = ms => { const s = (Date.now() - ms) / 1000; if (s < 3600) return `il y a ${Math.max(1, Math.floor(s / 60))} min`; if (s < 86400) return `il y a ${Math.floor(s / 3600)} h`; return new Date(ms).toLocaleDateString("fr-FR", { day: "numeric", month: "long" }); };
+
+window.render = a => {
+  const body = clean(a.html, a.url);
+  const lead = a.lead && !body.includes(a.lead) ? `<img class="lead" src="${esc(a.lead)}" alt="">` : "";
+  const site = a.site || a.source || "";
+  $("#root").innerHTML = `<article class="wrap">
+    <span class="kick"><span>${esc(site || "Actu")}</span></span>
+    <h1>${esc(a.title || "")}</h1>
+    <div class="by">${a.byline ? `<b>${esc(a.byline)}</b> · ` : ""}${esc(site)}${a.pub ? ` · ${esc(ago(a.pub))}` : ""}</div>
+    ${lead}<div class="body">${body}</div>
+    <div class="end"><p><b>Texte extrait de ${esc(site || "la page du média")}.</b> Mise en page Dogues, sans pubs. L'article original reste sur le site du média.</p>${btnOut}</div>
+  </article>`;
+  window.scrollTo(0, 0);
+};
+
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-act]");
+  if (b) { e.preventDefault(); if (!A) return; if (b.dataset.act === "page") A.showPage(); else A.openBrowser(); return; }
+  const a = e.target.closest(".body a[href]");
+  if (a && A) { e.preventDefault(); A.openLink(a.href); }
+});
+window.state("loading");
+if (A) A.readerReady();
+})();
+</script>
+</body>
+</html>

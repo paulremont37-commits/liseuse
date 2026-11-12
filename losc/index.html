@@ -109,6 +109,13 @@ a{color:inherit;text-decoration:none}
 .abs .x.q{background:none;border:2px solid var(--mist);color:var(--mist)}
 .abs b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .abs small{color:var(--mist);text-align:right}
+.abs a.r{grid-template-columns:auto minmax(0,1fr);color:inherit;text-decoration:none;align-items:start}
+.abs a.r b{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.3}
+.abs a.r small{display:block;text-align:left;margin-top:3px;font-size:12.5px}
+.ext{display:flex;align-items:center;gap:12px;padding:14px 16px;border:1.5px solid rgba(255,255,255,.18);color:var(--white);text-decoration:none}
+.ext span{font-size:13px;color:var(--mist)}
+.ext b{margin-left:auto;font-family:var(--f-cond);font-style:italic;font-weight:900;font-size:18px;letter-spacing:.04em;text-transform:uppercase}
+.ext svg{width:18px;height:18px;color:var(--red-hot);flex:none}
 .pitch{position:relative;width:100%;aspect-ratio:68/80;background:repeating-linear-gradient(180deg,rgba(255,255,255,.035) 0 10%,transparent 10% 20%),var(--navy-2);border:2px solid rgba(255,255,255,.35);overflow:hidden}
 .pitch .ln{position:absolute;border:2px solid rgba(255,255,255,.3)}
 .pitch .half{left:-2px;right:-2px;top:-2px;height:50%;border-top:0;border-left:0;border-right:0}
@@ -365,7 +372,7 @@ function load() {
   if (NATIVE) {
     try { D = JSON.parse(NATIVE.data() || "{}"); } catch (e) { D = {}; }
     try { P = JSON.parse(NATIVE.settings() || "{}"); } catch (e) { P = {}; }
-  } else { D = demo(); P = { hasKey: true, keyHint: "••••demo", notifGoals: true, notifLineup: true, notifNews: true, notifAllowed: true, budget: { used: 18, remaining: 82 } }; }
+  } else { D = demo(); P = { notifGoals: true, notifLineup: true, notifNews: true, notifAllowed: true }; }
 }
 const TEAM = () => D.team || 0;
 const isUs = t => t && t.id === TEAM();
@@ -464,35 +471,32 @@ function lineupBlk(m, live) {
   return `<div class="blk">${head(`La compo${lu.formation ? " · " + esc(lu.formation) : ""}`, lu.coach ? "Coach : " + esc(lu.coach) : "")}${pitch(lu)}
     ${lu.subs && lu.subs.length ? `<p class="bench">Banc : ${lu.subs.map(p => esc(p.name)).join(", ")}</p>` : ""}</div>`;
 }
-function absentsBlk(f) {
-  const known = D.injFixture === f.id;
-  const list = known ? (D.injuries || []).filter(i => i.team === TEAM()) : [];
-  const q = i => /questionable/i.test(i.type);
-  return `<div class="blk">${head("Infirmerie", known && D.injAt ? `vérifié ${ago(D.injAt)}` : "")}${
-    !known ? `<p class="muted">Pas encore d'infos pour ce match.</p>` :
-    !list.length ? `<p class="muted">Aucun absent signalé pour l'instant.</p>` :
-    `<div class="abs">${list.map(i => `<div class="r"><span class="x${q(i) ? " q" : ""}">${q(i) ? "?" : "×"}</span><b>${esc(i.name)}</b><small>${q(i) ? "Incertain · " : ""}${esc(reasonFr(i.reason))}</small></div>`).join("")}</div>`}</div>`;
+function absentsBlk() {
+  const list = (D.news || []).filter(n => (n.tag === "Infirmerie" || n.tag === "Suspension") && n.pub > Date.now() - 10 * 864e5).slice(0, 4);
+  return `<div class="blk">${head("Infirmerie", "d'après les actus")}${
+    !list.length ? `<p class="muted">Aucune actu sur des blessés ou suspendus ces derniers jours.</p>` :
+    `<div class="abs">${list.map(n => `<a class="r" href="${esc(n.link)}" data-src="${esc(n.source)}"><span class="x">${n.tag === "Suspension" ? "S" : "+"}</span><div><b>${esc(n.title)}</b><small>${esc(n.source)} · ${esc(ago(n.pub))}</small></div></a>`).join("")}</div>`}</div>`;
 }
 function renderHero() {
   const h = $("#hero"); const list = fixtures(); const f = nextFx(list); const last = lastFx(list);
   const err = D.errors && D.errors.api;
   let html = "";
-  if (NATIVE && (!P.hasKey || err === "nokey")) html += `<div class="alert"><p><b>Il manque ta clé</b>Ajoute ta clé API-Football pour les matchs, compos et absents. Les actus marchent déjà.</p><button class="btn" data-act="settings">Ajouter</button></div>`;
-  else if (err) html += `<div class="alert"><p><b>Infos matchs indisponibles</b>${esc(err)}</p><button class="btn" data-act="settings">Réglages</button></div>`;
+  if (err) html += `<div class="alert"><p><b>Infos matchs indisponibles</b>${esc(err)}</p></div>`;
   if (f) {
     const live = LIVE.has(f.status);
     html += poster(f);
     if (live) html += eventsBlk(f);
     html += lineupBlk(f, live);
-    if (!live) html += absentsBlk(f);
+    if (!live) html += absentsBlk();
     checkGoal(f);
   } else {
-    const msg = D.fixtures && D.fixtures.length ? "Pas de match programmé" : NATIVE && !P.hasKey ? "En attente de ta clé" : "Chargement…";
+    const msg = D.fixtures && D.fixtures.length ? "Pas de match programmé" : "Chargement…";
     html += `<article class="affiche">${BIGCLAW}<div class="ghost">Dogues</div><div class="in"><div class="ribbon">${flag("Prochain match")}</div><div class="vsblock"><div class="tname out">${msg}</div></div></div></article>`;
   }
   if (last && (!f || last.id !== f.id)) {
     html += `<div class="blk">${head("Dernier match", esc(fmt(last.ts, { weekday: "long", day: "numeric", month: "long" })))}<div class="last">${stamp(outcome(last))}<div class="who"><b>${esc(last.home.name)} – ${esc(last.away.name)}</b><small>${esc(leagueFr(last.league))}</small></div><span class="sc num">${last.gh}–${last.ga}</span></div></div>`;
   }
+  html += `<a class="ext" href="https://www.fotmob.com/fr/teams/8639/overview/lille"><span>Stats détaillées</span><b>Ouvrir dans FotMob</b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M7 17 17 7M9 7h8v8"/></svg></a>`;
   h.innerHTML = html;
 }
 
@@ -526,7 +530,7 @@ function viewNews() {
     ${err ? `<p class="meta">${esc(err)} Dernières actus connues :</p>` : ""}
     ${une ? `<a class="une${isNew(une) ? " new" : ""}" href="${esc(une.link)}" data-src="${esc(une.source)}" target="_blank" rel="noopener">${kick(une)}<h2>${esc(une.title)}</h2><div class="meta"><b>${esc(une.source)}</b> · ${esc(ago(une.pub))}</div></a>` : `<p class="meta">Rien dans cette rubrique.</p>`}
     <div class="cols">${rest.slice(0, 60).map(n => `<a class="art${isNew(n) ? " new" : ""}" href="${esc(n.link)}" data-src="${esc(n.source)}" target="_blank" rel="noopener">${kick(n)}<h3>${esc(n.title)}</h3><div class="meta"><b>${esc(n.source)}</b> · ${esc(ago(n.pub))}</div></a>`).join("")}</div>
-    <p class="note">Titres issus de Google Actualités, mis à jour toutes les 10 minutes. L'article s'ouvre dans l'appli.</p>`;
+    <p class="note">Titres issus de Google Actualités, mis à jour toutes les 10 minutes. L'article s'ouvre en mode lecture, sans pubs.</p>`;
 }
 function fxRow(f, isNext) {
   const opp = isUs(f.home) ? f.away : f.home;
@@ -539,7 +543,7 @@ function fxRow(f, isNext) {
 }
 function viewMatches() {
   const list = fixtures();
-  if (!list.length) return `<p class="meta">${NATIVE && !P.hasKey ? "Ajoute ta clé API-Football dans les réglages pour voir le calendrier." : "Chargement du calendrier…"}</p>`;
+  if (!list.length) return `<p class="meta">${"Chargement du calendrier…"}</p>`;
   const nx = nextFx(list);
   const up = list.filter(f => LIVE.has(f.status) || (!DONE.has(f.status) && f.ts * 1000 > Date.now() - 3 * 3600e3)).slice(0, 8);
   const done = list.filter(f => DONE.has(f.status)).slice(-10).reverse();
@@ -554,48 +558,43 @@ const zoneColor = d => /champions/i.test(d) ? "#1f5bd8" : /europa league/i.test(
 const zoneFr = z => /champions/i.test(z) ? "Ligue des champions" : /europa league/i.test(z) ? "Ligue Europa" : /conference/i.test(z) ? "Ligue Conférence" : /relegation/i.test(z) && /play/i.test(z) ? "Barrage" : /relegation/i.test(z) ? "Relégation" : z;
 function viewTable() {
   const rows = D.standings || [];
-  if (!rows.length) return `<p class="meta">${NATIVE && !P.hasKey ? "Ajoute ta clé API-Football dans les réglages pour voir le classement." : "Chargement du classement…"}</p>`;
+  if (!rows.length) return `<p class="meta">${"Chargement du classement…"}</p>`;
   const form = s => `<span class="form">${(s || "").slice(-5).split("").map(c => `<i class="${c}">${c === "W" ? "V" : c === "D" ? "N" : "D"}</i>`).join("")}</span>`;
-  const zones = [...new Set(rows.map(r => r.desc).filter(z => z && zoneColor(z)))];
+  const zc = r => zoneColor(r.desc) || (r.desc && /^#?[0-9a-f]{6}$/i.test(r.color || "") ? "#" + r.color.replace("#", "") : "");
+  const zones = []; rows.forEach(r => { const c = zc(r); if (c && r.desc && !zones.some(z => z[0] === r.desc)) zones.push([r.desc, c]); });
+  const hasForm = rows.some(r => r.form);
   const sc = D.scorers || [];
-  return `<div class="sect">${flag("Ligue 1")}</div><div class="tw"><table><thead><tr><th class="l">#</th><th class="l">Club</th><th>J</th><th class="hide-sm">V</th><th class="hide-sm">N</th><th class="hide-sm">D</th><th>Diff</th><th>Pts</th><th class="hide-sm">Forme</th></tr></thead><tbody>
-    ${rows.map(r => `<tr class="${r.id === TEAM() ? "us" : ""}"><td class="rk num">${zoneColor(r.desc) ? `<i class="z" style="background:${zoneColor(r.desc)}"></i>` : ""}${r.rank}</td><td class="l">${esc(r.name)}</td><td>${r.played}</td><td class="hide-sm">${r.win}</td><td class="hide-sm">${r.draw}</td><td class="hide-sm">${r.lose}</td><td>${r.diff > 0 ? "+" : ""}${r.diff}</td><td class="pts">${r.pts}</td><td class="hide-sm">${form(r.form)}</td></tr>`).join("")}
+  return `<div class="sect">${flag("Ligue 1")}</div><div class="tw"><table><thead><tr><th class="l">#</th><th class="l">Club</th><th>J</th><th class="hide-sm">V</th><th class="hide-sm">N</th><th class="hide-sm">D</th><th>Diff</th><th>Pts</th>${hasForm ? `<th class="hide-sm">Forme</th>` : ""}</tr></thead><tbody>
+    ${rows.map(r => `<tr class="${r.id === TEAM() ? "us" : ""}"><td class="rk num">${zc(r) ? `<i class="z" style="background:${zc(r)}"></i>` : ""}${r.rank}</td><td class="l">${esc(r.name)}</td><td>${r.played}</td><td class="hide-sm">${r.win}</td><td class="hide-sm">${r.draw}</td><td class="hide-sm">${r.lose}</td><td>${r.diff > 0 ? "+" : ""}${r.diff}</td><td class="pts">${r.pts}</td>${hasForm ? `<td class="hide-sm">${form(r.form)}</td>` : ""}</tr>`).join("")}
     </tbody></table></div>
-    ${zones.length ? `<div class="legend">${zones.map(z => `<span><i style="background:${zoneColor(z)}"></i>${esc(zoneFr(z))}</span>`).join("")}</div>` : ""}
-    ${sc.length ? `<div class="sect">${flag("Buteurs de Ligue 1")}</div><div>${sc.map((s, i) => `<div class="scr${s.teamId === TEAM() ? " us" : ""}"><span class="n num">${i + 1}</span><div><b>${esc(s.name)}</b><small>${esc(s.team)}${s.assists ? ` · ${s.assists} passe${s.assists > 1 ? "s" : ""}` : ""}</small></div><span class="g num">${s.goals}</span></div>`).join("")}</div>` : ""}`;
+    ${zones.length ? `<div class="legend">${zones.map(([z, c]) => `<span><i style="background:${c}"></i>${esc(zoneFr(z))}</span>`).join("")}</div>` : ""}
+    ${sc.length ? `<div class="sect">${flag("Buteurs du LOSC")}${D.scorersCount ? `<span class="aside">sur ${D.scorersCount} match${D.scorersCount > 1 ? "s" : ""}</span>` : ""}</div><div>${sc.map((s, i) => `<div class="scr${s.teamId === TEAM() ? " us" : ""}"><span class="n num">${i + 1}</span><div><b>${esc(s.name)}</b><small>${s.assists ? `${s.assists} passe${s.assists > 1 ? "s" : ""} décisive${s.assists > 1 ? "s" : ""}` : "toutes compétitions"}</small></div><span class="g num">${s.goals}</span></div>`).join("")}</div>` : ""}`;
 }
 function viewSquad() {
   const sq = D.squad || [];
-  if (!sq.length) return `<p class="meta">${NATIVE && !P.hasKey ? "Ajoute ta clé API-Football dans les réglages pour voir l'effectif." : "Chargement de l'effectif…"}</p>`;
-  const inj = new Map((D.injuries || []).filter(i => i.team === TEAM()).map(i => [i.id, i]));
+  if (!sq.length) return `<p class="meta">Chargement de l'effectif…</p>`;
   return Object.entries(POS).map(([k, label]) => {
     const g = sq.filter(p => p.pos === k).sort((a, b) => (a.number || 99) - (b.number || 99));
     if (!g.length) return "";
-    return `<div class="sect">${flag(label)}<span class="aside">${g.length}</span></div><div class="jerseys">${g.map(p => {
-      const i = inj.get(p.id); const q = i && /questionable/i.test(i.type);
-      return `<div class="jersey${i && !q ? " out" : ""}"><span class="bn num">${p.number || ""}</span>${i ? `<span class="tg${q ? " q" : ""}">${q ? "Incertain" : "Absent"}</span>` : ""}<b>${esc(p.name)}</b><small>${p.age ? p.age + " ans" : ""}${i ? " · " + esc(reasonFr(i.reason)) : ""}</small></div>`; }).join("")}</div>`;
-  }).join("") + `<p class="note">« Absent » et « Incertain » concernent le prochain match.</p>`;
+    return `<div class="sect">${flag(label)}<span class="aside">${g.length}</span></div><div class="jerseys">${g.map(p =>
+      `<div class="jersey"><span class="bn num">${p.number || ""}</span><b>${esc(p.name)}</b><small>${p.age ? p.age + " ans" : ""}</small></div>`).join("")}</div>`;
+  }).join("");
 }
 
 /* ---------------- réglages ---------------- */
 function openSettings() {
-  const b = P.budget || {};
   $("#sheetRoot").innerHTML = `<div class="scrim" data-act="scrim"><div class="sheet" role="dialog" aria-modal="true">${BIGCLAW}
     <h2>Réglages</h2>
-    <h4>Clé API-Football</h4>
-    <p>${P.hasKey ? `Clé enregistrée (${esc(P.keyHint || "")}). Colle une nouvelle clé pour la remplacer.` : "Elle donne accès aux matchs, compos, absents, classement et effectif."}</p>
-    <div class="field"><input id="key" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Colle ta clé ici" maxlength="64"><button class="btn red" data-act="save-key">Enregistrer</button></div>
-    ${P.hasKey ? "" : `<ol class="steps" style="margin-top:12px"><li>Crée un compte gratuit sur <b>dashboard.api-football.com</b>.</li><li>Copie ton <b>API Key</b> dans le tableau de bord.</li><li>Colle-la ci-dessus.</li></ol>`}
-    ${b.remaining >= 0 ? `<p class="small" style="margin-top:10px">Aujourd'hui : ${b.used || 0} requêtes utilisées, ${b.remaining} restantes sur 100. Le quota se recharge chaque nuit à 1 h.</p>` : ""}
     <h4>Notifications</h4>
     ${P.notifAllowed === false ? `<div class="alert" style="margin-bottom:8px"><p>Les notifications sont bloquées pour l'appli.</p><button class="btn" data-act="notif-settings">Autoriser</button></div>` : ""}
     <div class="row" style="border-top:0"><div>Buts et score final<small>Pendant les matchs du LOSC</small></div><button class="switch" role="switch" data-pref="notifGoals" aria-checked="${!!P.notifGoals}" aria-label="Buts et score final"></button></div>
     <div class="row"><div>Compo officielle<small>Environ une heure avant le match</small></div><button class="switch" role="switch" data-pref="notifLineup" aria-checked="${!!P.notifLineup}" aria-label="Compo officielle"></button></div>
     <div class="row"><div>Grosses actus<small>Mercato, blessures, suspensions, officiel · 8 max par jour</small></div><button class="switch" role="switch" data-pref="notifNews" aria-checked="${!!P.notifNews}" aria-label="Grosses actus"></button></div>
     <h4>Comment ça marche</h4>
-    <p>L'appli se met à jour toute seule : toutes les 10 minutes, toutes les 5 minutes avant un match et toutes les 3 minutes pendant. Écran éteint, Android peut retarder un peu les mises à jour.</p>
-    <p>Pour tenir dans les 100 requêtes gratuites par jour, le calendrier se rafraîchit toutes les 3 h, le classement et l'infirmerie toutes les 6 h (toutes les heures le jour du match), l'effectif une fois par jour.</p>
-    <p class="small">Appli de fan non officielle, sans lien avec le club. Données : API-Football et Google Actualités.</p>
+    <p>Tout est gratuit, sans compte ni clé. L'appli se met à jour toute seule : toutes les 10 minutes, toutes les 4 minutes autour d'un match et toutes les 2 minutes pendant. Écran éteint, Android peut retarder un peu les mises à jour.</p>
+    <p>Les articles s'ouvrent en mode lecture : l'appli garde seulement le texte et les images de l'article, sans pubs. Les articles réservés aux abonnés restent sur le site du média.</p>
+    <p>Aucune source gratuite ne donne la liste des blessés : l'infirmerie reprend les actus qui en parlent.</p>
+    <p class="small">Appli de fan non officielle, sans lien avec le club. Données : ESPN (matchs, compos, classement, effectif) et Google Actualités. Mode lecture : Readability de Mozilla.</p>
     <div class="foot"><button class="btn" data-act="close">Fermer</button></div>
   </div></div>`;
 }
@@ -629,12 +628,6 @@ document.addEventListener("click", e => {
   if (act === "scrim" || act === "close") closeSheet();
   else if (act === "settings") openSettings();
   else if (act === "notif-settings") { if (NATIVE) NATIVE.openNotifSettings(); }
-  else if (act === "save-key") {
-    const k = $("#key").value.trim();
-    if (!/^[A-Za-z0-9]{20,64}$/.test(k)) { toast("Ça ne ressemble pas à une clé API-Football (lettres et chiffres)."); return; }
-    if (NATIVE) { NATIVE.setKey(k); refreshing = D.updatedAt || 1; $("#refresh").classList.add("spin"); }
-    closeSheet(); toast("Clé enregistrée. Chargement des matchs…");
-  }
 });
 document.addEventListener("keydown", e => { if (e.key === "Escape") { closeSheet(); $("#goalRoot").innerHTML = ""; } });
 
@@ -664,14 +657,12 @@ function demo() {
     fx(6 * J, t("AC Démo"), us, "NS", -1, -1, "UEFA Europa League", "League Stage - 5"), fx(10 * J, us, t("Union Exemple"), "NS", -1, -1, "Ligue 1", "Regular Season - 15")
   ];
   const names = ["Exemple FC", "Racing Exemple", "Sporting Démo", "Lille", "Olympique Test", "Stade Exemple", "AC Démo", "Union Exemple", "Athletic Test", "Club Démo"];
-  const standings = names.map((n, i) => ({ rank: i + 1, id: n === "Lille" ? 79 : 1000 + i, name: n, pts: 30 - i * 2, diff: 14 - i * 3, form: ["WWDLW", "WDWWL", "LWWDW", "WDLWW", "DDWLW", "LLWDW", "WLLDD", "DLWLL", "LDLLW", "LLDLL"][i], desc: i < 3 ? "Promotion - Champions League (League phase)" : i === 4 ? "Promotion - Europa League (League phase)" : i === 9 ? "Relegation - Ligue 2" : "", played: 13, win: 9 - i, draw: 3, lose: 1 + i, gf: 25 - i, ga: 11 + i }));
+  const standings = names.map((n, i) => ({ rank: i + 1, id: n === "Lille" ? 79 : 1000 + i, name: n, pts: 30 - i * 2, diff: 14 - i * 3, form: "", desc: i < 3 ? "Champions League" : i === 4 ? "Europa League" : i === 9 ? "Relegation" : "", played: 13, win: 9 - i, draw: 3, lose: 1 + i, gf: 25 - i, ga: 11 + i }));
   const m = x => Date.now() - x * 60e3;
   return {
     team: 79, updatedAt: m(2), nextAt: Date.now() + 8 * 60e3, fixtures, standings,
-    injFixture: 5000 + 2 * J + 7 * H, injAt: m(90),
-    injuries: [{ id: 4, name: "Joueur Exemple 4", type: "Missing Fixture", reason: "Hamstring Injury", team: 79 }, { id: 10, name: "Joueur Exemple 9", type: "Questionable", reason: "Knock", team: 79 }],
     squad: [["Goalkeeper", 1], ["Goalkeeper", 30], ["Defender", 2], ["Defender", 4], ["Defender", 5], ["Defender", 18], ["Midfielder", 8], ["Midfielder", 10], ["Midfielder", 21], ["Attacker", 9], ["Attacker", 7], ["Attacker", 11]].map(([pos, n], i) => ({ id: n === 9 ? 10 : n === 4 ? 4 : 100 + i, name: `Joueur Exemple ${n}`, number: n, age: 20 + (i * 3) % 12, pos })),
-    scorers: [{ name: "Buteur Exemple", team: "Exemple FC", teamId: 1, goals: 11, assists: 2 }, { name: "Joueur Exemple 9", team: "Lille", teamId: 79, goals: 8, assists: 3 }, { name: "Autre Buteur", team: "Sporting Démo", teamId: 3, goals: 7, assists: 1 }],
+    scorers: [{ name: "Joueur Exemple 9", team: "Lille", teamId: 79, goals: 6, assists: 2 }, { name: "Joueur Exemple 10", team: "Lille", teamId: 79, goals: 4, assists: 5 }, { name: "Joueur Exemple 7", team: "Lille", teamId: 79, goals: 3, assists: 0 }], scorersCount: 4,
     news: [
       { id: "a", title: "Titre d'exemple : le point sur l'infirmerie avant le prochain match", source: "Média exemple", link: "https://example.com", pub: m(14), tag: "Infirmerie" },
       { id: "b", title: "Titre d'exemple : une piste offensive pour le mercato d'hiver", source: "Média exemple 2", link: "https://example.com", pub: m(48), tag: "Mercato" },
@@ -679,7 +670,7 @@ function demo() {
       { id: "d", title: "Titre d'exemple : le club annonce une prolongation de contrat", source: "Média exemple 3", link: "https://example.com", pub: m(600), tag: "Officiel" },
       { id: "e", title: "Titre d'exemple : ce qu'il faut retenir de la conférence de presse", source: "Média exemple 2", link: "https://example.com", pub: m(900), tag: "" }
     ],
-    errors: {}, budget: { used: 18, remaining: 82 }
+    errors: {}
   };
 }
 

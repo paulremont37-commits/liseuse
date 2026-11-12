@@ -27,13 +27,16 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -44,16 +47,24 @@ import okhttp3.Response;
  * Tout est récupéré ici, côté Android, pour que les mises à jour et les notifications
  * marchent aussi quand l'appli est fermée. L'interface lit juste le fichier losc.json.
  *
- * Sources :
- *  - actus : flux RSS de Google Actualités (titres + liens vers les articles) ;
- *  - matchs, live, compos, absents, classement, effectif : API-Football (clé perso, 100 requêtes/jour).
+ * Sources (gratuites, sans clé) :
+ *  - actus : flux RSS de Google Actualités ;
+ *  - matchs, direct, compos, classement, effectif : données publiques d'ESPN.
  */
 final class Losc {
     private Losc() {}
 
     static final String PREFS = "losc";
-    static final String API = "https://v3.football.api-sports.io";
-    static final int LIGUE1 = 61;
+    static final String ESPN = "https://site.api.espn.com/apis/site/v2/sports/soccer/";
+    static final String ESPN_STANDINGS = "https://site.api.espn.com/apis/v2/sports/soccer/";
+    /** Compétitions suivies : championnat, coupes d'Europe, coupe de France. */
+    static final String[][] LEAGUES = {
+            {"fra.1", "Ligue 1"},
+            {"uefa.champions", "Ligue des champions"},
+            {"uefa.europa", "Ligue Europa"},
+            {"uefa.europa.conf", "Ligue Conférence"},
+            {"fra.coupe_de_france", "Coupe de France"},
+    };
     static final long MIN = 60_000L, HOUR = 60 * MIN;
     static final Object LOCK = new Object();
 
@@ -70,7 +81,7 @@ final class Losc {
         if (http == null) {
             http = new OkHttpClient.Builder()
                     .connectTimeout(10, TimeUnit.SECONDS)
-                    .readTimeout(20, TimeUnit.SECONDS)
+                    .readTimeout(25, TimeUnit.SECONDS)
                     .build();
         }
         return http;
@@ -80,10 +91,6 @@ final class Losc {
         Set<String> s = new HashSet<>();
         Collections.addAll(s, v);
         return s;
-    }
-
-    static class ApiError extends Exception {
-        ApiError(String m) { super(m); }
     }
 
     /* ------------------------------------------------------------------ fichier */
@@ -134,40 +141,27 @@ final class Losc {
             JSONObject errors = d.optJSONObject("errors");
             if (errors == null) errors = new JSONObject();
 
-            // Actus : au plus une fois toutes les 9 minutes (ou tout de suite si on force)
             if (force || now - d.optLong("newsAt", 0) > 9 * MIN) {
                 try {
                     fetchNews(c, d, p);
-                    d.put("newsAt", now);
+                    put(d, "newsAt", now);
                     errors.remove("news");
                 } catch (Exception e) {
                     put(errors, "news", "Actus indisponibles pour le moment.");
                 }
             }
 
-            // Données foot
-            String key = p.getString("key", "").trim();
-            if (key.isEmpty()) {
-                put(errors, "api", "nokey");
-            } else if (force || now - p.getLong("apiErrAt", 0) > HOUR) {
-                try {
-                    footData(c, d, p, key, now, force);
-                    errors.remove("api");
-                    p.edit().remove("apiErrAt").apply();
-                } catch (ApiError e) {
-                    put(errors, "api", e.getMessage());
-                    p.edit().putLong("apiErrAt", now).apply();
-                } catch (Exception e) {
-                    put(errors, "api", "Connexion à la base foot impossible. Nouvel essai bientôt.");
-                    p.edit().putLong("apiErrAt", now - HOUR + 10 * MIN).apply();
-                }
+            try {
+                footData(c, d, p, now, force);
+                errors.remove("api");
+            } catch (Exception e) {
+                put(errors, "api", "Impossible de joindre les données des matchs pour l'instant. Nouvel essai dans quelques minutes.");
             }
 
             delay = nextDelay(d, now);
             put(d, "errors", errors);
             put(d, "updatedAt", now);
             put(d, "nextAt", now + delay);
-            put(d, "budget", budget(p));
             save(c, d);
         }
         Listener l = listener;
@@ -177,115 +171,91 @@ final class Losc {
 
     static long nextDelay(JSONObject d, long now) {
         JSONObject m = d.optJSONObject("match");
-        if (m != null && LIVE.contains(m.optString("status"))) return 3 * MIN;
+        if (m != null && LIVE.contains(m.optString("status"))) return 2 * MIN;
         JSONObject next = nextFixture(d, now);
         if (next != null) {
             long ko = next.optLong("ts") * 1000;
-            if (now >= ko - 90 * MIN && now <= ko + 150 * MIN) return 5 * MIN;
+            if (now >= ko - 90 * MIN && now <= ko + 150 * MIN) return 4 * MIN;
         }
         return 10 * MIN;
     }
 
-    /* ------------------------------------------------------------------ API-Football */
+    /* ------------------------------------------------------------------ ESPN */
 
-    static int season(long now) {
+    static JSONObject get(String url) throws IOException, JSONException {
+        Request r = new Request.Builder().url(url).header("User-Agent", "Mozilla/5.0 (Linux; Android) Dogues").build();
+        try (Response res = http().newCall(r).execute()) {
+            if (!res.isSuccessful() || res.body() == null) throw new IOException("HTTP " + res.code());
+            return new JSONObject(res.body().string());
+        }
+    }
+
+    static String day(long ms) {
+        SimpleDateFormat f = new SimpleDateFormat("yyyyMMdd", Locale.US);
+        f.setTimeZone(TimeZone.getTimeZone("UTC"));
+        return f.format(ms);
+    }
+
+    /** Début de saison : 1er juillet. */
+    static long seasonStart(long now) {
         Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("Europe/Paris"));
         cal.setTimeInMillis(now);
         int y = cal.get(Calendar.YEAR);
-        return cal.get(Calendar.MONTH) >= Calendar.JULY ? y : y - 1;
+        if (cal.get(Calendar.MONTH) < Calendar.JULY) y--;
+        cal.clear();
+        cal.set(y, Calendar.JULY, 1);
+        return cal.getTimeInMillis();
     }
 
-    static String utcDay() {
-        SimpleDateFormat f = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
-        f.setTimeZone(TimeZone.getTimeZone("UTC"));
-        return f.format(System.currentTimeMillis());
-    }
-
-    static JSONObject budget(SharedPreferences p) {
-        JSONObject b = new JSONObject();
-        boolean today = utcDay().equals(p.getString("budgetDay", ""));
-        put(b, "used", today ? p.getInt("used", 0) : 0);
-        put(b, "remaining", today ? p.getInt("remaining", -1) : -1);
-        return b;
-    }
-
-    static JSONObject api(SharedPreferences p, String key, String path) throws Exception {
-        String today = utcDay();
-        if (!today.equals(p.getString("budgetDay", ""))) {
-            p.edit().putString("budgetDay", today).putInt("used", 0).putInt("remaining", -1).apply();
-        }
-        if (p.getInt("remaining", -1) == 0) {
-            throw new ApiError("Quota du jour atteint (100 requêtes). Il se recharge à 1 h du matin.");
-        }
-        Request r = new Request.Builder().url(API + path).header("x-apisports-key", key).build();
-        try (Response res = http().newCall(r).execute()) {
-            SharedPreferences.Editor e = p.edit().putInt("used", p.getInt("used", 0) + 1);
-            String rem = res.header("x-ratelimit-requests-remaining");
-            if (rem != null) {
-                try { e.putInt("remaining", Integer.parseInt(rem.trim())); } catch (NumberFormatException ignored) { }
-            }
-            e.apply();
-            if (res.code() == 429) throw new ApiError("Trop de requêtes d'un coup. Nouvel essai dans quelques minutes.");
-            if (res.code() == 401 || res.code() == 403) throw new ApiError("Clé API refusée. Vérifie-la dans les réglages.");
-            String body = res.body() != null ? res.body().string() : "";
-            JSONObject o = new JSONObject(body);
-            String msg = errorText(o.opt("errors"));
-            if (msg != null) throw new ApiError(msg);
-            return o;
-        }
-    }
-
-    static String errorText(Object errs) {
-        if (errs instanceof JSONObject) {
-            JSONObject j = (JSONObject) errs;
-            if (j.length() == 0) return null;
-            if (j.has("token")) return "Clé API refusée. Vérifie-la dans les réglages.";
-            if (j.has("requests")) return "Quota du jour atteint (100 requêtes). Il se recharge à 1 h du matin.";
-            if (j.has("rateLimit")) return "Trop de requêtes d'un coup. Nouvel essai dans quelques minutes.";
-            if (j.has("plan")) return "L'abonnement gratuit API-Football ne donne pas accès à cette saison (" + j.optString("plan") + ").";
-            Iterator<String> k = j.keys();
-            return k.hasNext() ? j.optString(k.next()) : null;
-        }
-        if (errs instanceof JSONArray && ((JSONArray) errs).length() > 0) return ((JSONArray) errs).optString(0);
-        return null;
-    }
-
-    static void footData(Context c, JSONObject d, SharedPreferences p, String key, long now, boolean force) throws Exception {
-        int season = season(now);
-        put(d, "season", season);
-        JSONObject b = budget(p);
-        int remaining = b.optInt("remaining", -1);
-        boolean low = remaining >= 0 && remaining < 15;
-
-        // 1. L'identifiant de l'équipe (une seule fois)
-        int team = p.getInt("team", 0);
-        if (team == 0) {
-            JSONArray r = api(p, key, "/teams?search=Lille").optJSONArray("response");
-            for (int i = 0; r != null && i < r.length(); i++) {
-                JSONObject t = r.optJSONObject(i).optJSONObject("team");
-                if (t != null && "France".equals(t.optString("country")) && t.optString("name").startsWith("Lille")) {
-                    team = t.optInt("id");
+    static void footData(Context c, JSONObject d, SharedPreferences p, long now, boolean force) throws Exception {
+        // 1. Identifiant ESPN du club (une fois)
+        String team = p.getString("espnTeam", "");
+        if (team.isEmpty()) {
+            JSONObject o = get(ESPN + "fra.1/teams");
+            JSONArray teams = o.optJSONArray("sports") != null
+                    ? o.optJSONArray("sports").optJSONObject(0).optJSONArray("leagues").optJSONObject(0).optJSONArray("teams") : null;
+            for (int i = 0; teams != null && i < teams.length(); i++) {
+                JSONObject t = teams.optJSONObject(i).optJSONObject("team");
+                if (t == null) continue;
+                String n = t.optString("displayName") + " " + t.optString("shortDisplayName") + " " + t.optString("name");
+                if (n.contains("Lille") || "LIL".equals(t.optString("abbreviation"))) {
+                    team = t.optString("id");
                     break;
                 }
             }
-            if (team == 0) throw new ApiError("Équipe introuvable dans la base API-Football.");
-            p.edit().putInt("team", team).apply();
+            if (team.isEmpty()) throw new IOException("club introuvable");
+            p.edit().putString("espnTeam", team).apply();
         }
-        put(d, "team", team);
+        put(d, "team", Integer.parseInt(team));
+        put(d, "source", "espn");
 
-        // 2. Le calendrier de la saison (toutes compétitions) : toutes les 3 h, ou après un match
+        // 2. Calendrier toutes compétitions : toutes les 3 h, ou après un match
         long fxAt = d.optLong("fixturesAt", 0);
-        if (now - fxAt > 3 * HOUR || d.optBoolean("needsRefresh") || (force && now - fxAt > 30 * MIN)) {
-            JSONArray r = api(p, key, "/fixtures?team=" + team + "&season=" + season).optJSONArray("response");
+        if (now - fxAt > 3 * HOUR || d.optBoolean("needsRefresh") || (force && now - fxAt > 20 * MIN)) {
+            String range = day(seasonStart(now)) + "-" + day(now + 120L * 24 * HOUR);
             List<JSONObject> list = new ArrayList<>();
-            for (int i = 0; r != null && i < r.length(); i++) list.add(slimFixture(r.optJSONObject(i)));
+            int ok = 0;
+            for (String[] lg : LEAGUES) {
+                try {
+                    JSONObject o = get(ESPN + lg[0] + "/scoreboard?dates=" + range + "&limit=1000");
+                    ok++;
+                    JSONArray ev = o.optJSONArray("events");
+                    for (int i = 0; ev != null && i < ev.length(); i++) {
+                        JSONObject f = slimEvent(ev.optJSONObject(i), lg);
+                        if (f != null && involves(f, team)) list.add(f);
+                    }
+                } catch (Exception ignored) {
+                    // une compétition indisponible ne bloque pas les autres
+                }
+            }
+            if (ok == 0) throw new IOException("calendrier indisponible");
             Collections.sort(list, (x, y) -> Long.compare(x.optLong("ts"), y.optLong("ts")));
             put(d, "fixtures", new JSONArray(list));
             put(d, "fixturesAt", now);
             put(d, "needsRefresh", false);
         }
 
-        // 3. Le prochain match : live, compo, absents
+        // 3. Prochain match : direct, compo, fil du match
         JSONObject next = nextFixture(d, now);
         if (next != null) {
             long id = next.optLong("id");
@@ -296,21 +266,15 @@ final class Losc {
                 match = null;
             }
             boolean live = match != null ? LIVE.contains(match.optString("status")) : LIVE.contains(next.optString("status"));
-            boolean window = now >= ko - 90 * MIN && now <= ko + 150 * MIN;
+            boolean window = now >= ko - 100 * MIN && now <= ko + 150 * MIN;
             if (window || live) {
                 long mAt = d.optLong("matchAt", 0);
-                boolean hasLineup = match != null && match.optJSONArray("lineups") != null && match.optJSONArray("lineups").length() > 0;
-                boolean started = now >= ko - 2 * MIN;
-                boolean due;
-                if (live || started) due = now - mAt >= 150_000L;
-                else if (!hasLineup) due = now - mAt >= 9 * MIN;
-                else due = now - mAt >= 30 * MIN;
-                if (force && now - mAt >= MIN) due = true;
+                boolean due = (live || now >= ko - 2 * MIN) ? now - mAt >= 100_000L : now - mAt >= 8 * MIN;
+                if (force && now - mAt >= 30_000L) due = true;
                 if (due) {
-                    JSONArray r = api(p, key, "/fixtures?id=" + id).optJSONArray("response");
-                    if (r != null && r.length() > 0) {
-                        JSONObject m = slimMatch(r.optJSONObject(0));
-                        notifyMatch(c, p, match, m, team);
+                    JSONObject m = summary(next.optString("slug"), id, next);
+                    if (m != null) {
+                        notifyMatch(c, p, match, m, Integer.parseInt(team));
                         put(d, "match", m);
                         put(d, "matchAt", now);
                         if (DONE.contains(m.optString("status"))) {
@@ -321,109 +285,370 @@ final class Losc {
                     }
                 }
             }
-            // Absents pour ce match : toutes les 6 h, toutes les heures le jour du match
-            long injAt = d.optLong("injAt", 0);
-            boolean sameFixture = d.optLong("injFixture", 0) == id;
-            long every = window ? HOUR : 6 * HOUR;
-            if ((!sameFixture || now - injAt > every || (force && now - injAt > HOUR)) && (!low || window)) {
-                JSONArray r = api(p, key, "/injuries?fixture=" + id).optJSONArray("response");
-                JSONArray out = new JSONArray();
-                for (int i = 0; r != null && i < r.length(); i++) {
-                    JSONObject it = r.optJSONObject(i);
-                    JSONObject pl = it.optJSONObject("player");
-                    JSONObject tm = it.optJSONObject("team");
-                    if (pl == null) continue;
-                    JSONObject o = new JSONObject();
-                    put(o, "id", pl.optInt("id"));
-                    put(o, "name", pl.optString("name"));
-                    put(o, "type", pl.optString("type"));
-                    put(o, "reason", pl.optString("reason"));
-                    put(o, "team", tm != null ? tm.optInt("id") : 0);
-                    out.put(o);
-                }
-                put(d, "injuries", out);
-                put(d, "injFixture", id);
-                put(d, "injAt", now);
-            }
         }
 
-        if (low) return; // on garde le reste du quota pour les matchs
-
-        // 4. Classement de Ligue 1 : toutes les 6 h, et après chaque match
-        if (now - d.optLong("standingsAt", 0) > 6 * HOUR) {
-            JSONArray r = api(p, key, "/standings?league=" + LIGUE1 + "&season=" + season).optJSONArray("response");
-            JSONArray out = new JSONArray();
-            if (r != null && r.length() > 0) {
-                JSONObject lg = r.optJSONObject(0).optJSONObject("league");
-                JSONArray groups = lg != null ? lg.optJSONArray("standings") : null;
-                JSONArray rows = groups != null && groups.length() > 0 ? groups.optJSONArray(0) : null;
-                for (int i = 0; rows != null && i < rows.length(); i++) {
-                    JSONObject s = rows.optJSONObject(i);
-                    JSONObject t = s.optJSONObject("team");
-                    JSONObject all = s.optJSONObject("all");
-                    JSONObject goals = all != null ? all.optJSONObject("goals") : null;
-                    JSONObject o = new JSONObject();
-                    put(o, "rank", s.optInt("rank"));
-                    put(o, "id", t != null ? t.optInt("id") : 0);
-                    put(o, "name", t != null ? t.optString("name") : "");
-                    put(o, "pts", s.optInt("points"));
-                    put(o, "diff", s.optInt("goalsDiff"));
-                    put(o, "form", s.optString("form", ""));
-                    put(o, "desc", s.isNull("description") ? "" : s.optString("description"));
-                    put(o, "played", all != null ? all.optInt("played") : 0);
-                    put(o, "win", all != null ? all.optInt("win") : 0);
-                    put(o, "draw", all != null ? all.optInt("draw") : 0);
-                    put(o, "lose", all != null ? all.optInt("lose") : 0);
-                    put(o, "gf", goals != null ? goals.optInt("for") : 0);
-                    put(o, "ga", goals != null ? goals.optInt("against") : 0);
-                    out.put(o);
-                }
+        // 4. Classement de Ligue 1 : toutes les 2 h, et après chaque match
+        if (now - d.optLong("standingsAt", 0) > 2 * HOUR) {
+            JSONObject o = get(ESPN_STANDINGS + "fra.1/standings");
+            JSONArray children = o.optJSONArray("children");
+            JSONObject st = children != null && children.length() > 0 ? children.optJSONObject(0).optJSONObject("standings") : o.optJSONObject("standings");
+            JSONArray entries = st != null ? st.optJSONArray("entries") : null;
+            List<JSONObject> rows = new ArrayList<>();
+            for (int i = 0; entries != null && i < entries.length(); i++) {
+                JSONObject e = entries.optJSONObject(i);
+                JSONObject t = e.optJSONObject("team");
+                Map<String, Double> s = stats(e.optJSONArray("stats"));
+                JSONObject note = e.optJSONObject("note");
+                JSONObject r = new JSONObject();
+                put(r, "id", t != null ? t.optInt("id") : 0);
+                put(r, "name", t != null ? t.optString("displayName") : "");
+                put(r, "rank", (int) val(s, "rank", i + 1));
+                put(r, "pts", (int) val(s, "points", 0));
+                put(r, "played", (int) val(s, "gamesPlayed", 0));
+                put(r, "win", (int) val(s, "wins", 0));
+                put(r, "draw", (int) val(s, "ties", 0));
+                put(r, "lose", (int) val(s, "losses", 0));
+                put(r, "gf", (int) val(s, "pointsFor", 0));
+                put(r, "ga", (int) val(s, "pointsAgainst", 0));
+                put(r, "diff", (int) val(s, "pointDifferential", val(s, "pointsFor", 0) - val(s, "pointsAgainst", 0)));
+                put(r, "desc", note != null ? note.optString("description") : "");
+                put(r, "color", note != null ? note.optString("color") : "");
+                put(r, "form", "");
+                rows.add(r);
             }
-            put(d, "standings", out);
+            Collections.sort(rows, (x, y) -> Integer.compare(x.optInt("rank"), y.optInt("rank")));
+            put(d, "standings", new JSONArray(rows));
             put(d, "standingsAt", now);
         }
 
         // 5. Effectif : une fois par jour
         if (now - d.optLong("squadAt", 0) > 24 * HOUR) {
-            JSONArray r = api(p, key, "/players/squads?team=" + team).optJSONArray("response");
+            JSONObject o = get(ESPN + "fra.1/teams/" + team + "/roster");
             JSONArray out = new JSONArray();
-            JSONArray players = r != null && r.length() > 0 ? r.optJSONObject(0).optJSONArray("players") : null;
-            for (int i = 0; players != null && i < players.length(); i++) {
-                JSONObject pl = players.optJSONObject(i);
-                JSONObject o = new JSONObject();
-                put(o, "id", pl.optInt("id"));
-                put(o, "name", pl.optString("name"));
-                put(o, "age", pl.isNull("age") ? 0 : pl.optInt("age"));
-                put(o, "number", pl.isNull("number") ? 0 : pl.optInt("number"));
-                put(o, "pos", pl.optString("position"));
-                out.put(o);
+            JSONArray ath = o.optJSONArray("athletes");
+            for (int i = 0; ath != null && i < ath.length(); i++) {
+                JSONObject a = ath.optJSONObject(i);
+                if (a.has("items")) { // format groupé par poste
+                    JSONArray items = a.optJSONArray("items");
+                    for (int k = 0; items != null && k < items.length(); k++) out.put(slimPlayer(items.optJSONObject(k)));
+                } else {
+                    out.put(slimPlayer(a));
+                }
             }
             put(d, "squad", out);
             put(d, "squadAt", now);
         }
 
-        // 6. Meilleurs buteurs de Ligue 1 : une fois par jour
-        if (now - d.optLong("scorersAt", 0) > 24 * HOUR) {
-            JSONArray r = api(p, key, "/players/topscorers?league=" + LIGUE1 + "&season=" + season).optJSONArray("response");
-            JSONArray out = new JSONArray();
-            for (int i = 0; r != null && i < r.length() && i < 15; i++) {
-                JSONObject it = r.optJSONObject(i);
-                JSONObject pl = it.optJSONObject("player");
-                JSONArray st = it.optJSONArray("statistics");
-                JSONObject s0 = st != null && st.length() > 0 ? st.optJSONObject(0) : null;
-                JSONObject tm = s0 != null ? s0.optJSONObject("team") : null;
-                JSONObject g = s0 != null ? s0.optJSONObject("goals") : null;
-                JSONObject o = new JSONObject();
-                put(o, "name", pl != null ? pl.optString("name") : "");
-                put(o, "team", tm != null ? tm.optString("name") : "");
-                put(o, "teamId", tm != null ? tm.optInt("id") : 0);
-                put(o, "goals", g != null && !g.isNull("total") ? g.optInt("total") : 0);
-                put(o, "assists", g != null && !g.isNull("assists") ? g.optInt("assists") : 0);
-                out.put(o);
-            }
-            put(d, "scorers", out);
-            put(d, "scorersAt", now);
+        // 6. Buteurs du LOSC : calculés à partir des matchs terminés (5 nouveaux matchs max par passage)
+        scorers(d, team);
+    }
+
+    static boolean involves(JSONObject f, String team) {
+        JSONObject h = f.optJSONObject("home"), a = f.optJSONObject("away");
+        return (h != null && team.equals(String.valueOf(h.optInt("id")))) || (a != null && team.equals(String.valueOf(a.optInt("id"))));
+    }
+
+    static Map<String, Double> stats(JSONArray a) {
+        Map<String, Double> m = new HashMap<>();
+        for (int i = 0; a != null && i < a.length(); i++) {
+            JSONObject s = a.optJSONObject(i);
+            String n = s.optString("name", s.optString("type"));
+            if (s.has("value") && !s.isNull("value")) m.put(n, s.optDouble("value"));
         }
+        return m;
+    }
+
+    static double val(Map<String, Double> m, String k, double def) {
+        Double v = m.get(k);
+        if (v == null) v = m.get(k.toLowerCase(Locale.US));
+        return v == null || v.isNaN() ? def : v;
+    }
+
+    static JSONObject slimPlayer(JSONObject a) {
+        JSONObject o = new JSONObject();
+        JSONObject pos = a.optJSONObject("position");
+        String pn = pos != null ? (pos.optString("name") + " " + pos.optString("displayName") + " " + pos.optString("abbreviation")) : "";
+        String mapped = pn.contains("Goal") || pn.trim().equals("G") ? "Goalkeeper"
+                : pn.contains("Def") || pn.trim().equals("D") ? "Defender"
+                : pn.contains("Mid") || pn.trim().equals("M") ? "Midfielder"
+                : pn.contains("Forw") || pn.contains("Attack") || pn.trim().equals("F") ? "Attacker" : "Midfielder";
+        put(o, "id", a.optString("id"));
+        put(o, "name", a.optString("displayName", a.optString("fullName")));
+        put(o, "age", a.optInt("age", 0));
+        int jersey = 0;
+        try { jersey = Integer.parseInt(a.optString("jersey", "0").trim()); } catch (NumberFormatException ignored) { }
+        put(o, "number", jersey);
+        put(o, "pos", mapped);
+        return o;
+    }
+
+    /* ---- conversion d'un match ESPN dans le format de l'interface ---- */
+
+    static long parseDate(String s) {
+        String[] fmts = {"yyyy-MM-dd'T'HH:mm'Z'", "yyyy-MM-dd'T'HH:mm:ss'Z'", "yyyy-MM-dd'T'HH:mm:ssXXX"};
+        for (String f : fmts) {
+            try {
+                SimpleDateFormat p = new SimpleDateFormat(f, Locale.US);
+                p.setTimeZone(TimeZone.getTimeZone("UTC"));
+                return p.parse(s).getTime();
+            } catch (Exception ignored) { }
+        }
+        return 0;
+    }
+
+    /** Statut ESPN → codes courts (NS, 1H, HT, 2H, ET, P, FT, AET, PEN, PST, CANC…). */
+    static String status(JSONObject st) {
+        JSONObject t = st != null ? st.optJSONObject("type") : null;
+        if (t == null) return "NS";
+        String name = t.optString("name"), state = t.optString("state"), desc = (t.optString("description") + " " + t.optString("detail")).toLowerCase(Locale.US);
+        if (name.contains("POSTPONED") || desc.contains("postponed")) return "PST";
+        if (name.contains("CANCEL") || desc.contains("cancel")) return "CANC";
+        if (name.contains("ABANDON") || desc.contains("abandon")) return "ABD";
+        if (name.contains("SUSPEND")) return "SUSP";
+        if ("pre".equals(state)) return "NS";
+        if ("post".equals(state)) {
+            if (name.contains("PEN") || desc.contains("pen")) return "PEN";
+            if (name.contains("AET") || desc.contains("aet") || desc.contains("extra")) return "AET";
+            return "FT";
+        }
+        if (name.contains("HALFTIME") || desc.contains("halftime") || desc.equals("ht")) return "HT";
+        if (name.contains("SHOOTOUT") || desc.contains("shootout")) return "P";
+        int period = st.optInt("period", 1);
+        if (period >= 3 || name.contains("EXTRA")) return "ET";
+        return period >= 2 ? "2H" : "1H";
+    }
+
+    static int minute(JSONObject st) {
+        if (st == null) return -1;
+        Matcher m = Pattern.compile("(\\d+)").matcher(st.optString("displayClock", ""));
+        if (m.find()) return Integer.parseInt(m.group(1));
+        double clock = st.optDouble("clock", -1);
+        return clock >= 0 ? (int) (clock / 60) : -1;
+    }
+
+    static JSONObject slimEvent(JSONObject ev, String[] lg) {
+        if (ev == null) return null;
+        JSONArray comps = ev.optJSONArray("competitions");
+        JSONObject comp = comps != null && comps.length() > 0 ? comps.optJSONObject(0) : null;
+        if (comp == null) return null;
+        JSONObject st = comp.optJSONObject("status") != null ? comp.optJSONObject("status") : ev.optJSONObject("status");
+        JSONObject o = new JSONObject();
+        put(o, "id", Long.parseLong(ev.optString("id", "0").replaceAll("\\D", "0")));
+        put(o, "slug", lg[0]);
+        put(o, "league", lg[1]);
+        put(o, "round", "");
+        put(o, "ts", parseDate(comp.optString("date", ev.optString("date"))) / 1000);
+        String s = status(st);
+        put(o, "status", s);
+        put(o, "elapsed", LIVE.contains(s) ? minute(st) : -1);
+        JSONObject venue = comp.optJSONObject("venue");
+        put(o, "venue", venue != null ? venue.optString("fullName") : "");
+        JSONObject addr = venue != null ? venue.optJSONObject("address") : null;
+        put(o, "city", addr != null ? addr.optString("city") : "");
+        JSONArray cs = comp.optJSONArray("competitors");
+        for (int i = 0; cs != null && i < cs.length(); i++) {
+            JSONObject cpt = cs.optJSONObject(i);
+            JSONObject t = cpt.optJSONObject("team");
+            JSONObject team = new JSONObject();
+            put(team, "id", t != null ? t.optInt("id") : 0);
+            put(team, "name", t != null ? t.optString("shortDisplayName", t.optString("displayName")) : "");
+            boolean home = "home".equals(cpt.optString("homeAway"));
+            put(o, home ? "home" : "away", team);
+            int g = -1;
+            if (!"NS".equals(s) && !"PST".equals(s) && !"CANC".equals(s)) {
+                try { g = Integer.parseInt(cpt.optString("score", "").trim()); } catch (NumberFormatException ignored) { }
+            }
+            put(o, home ? "gh" : "ga", g);
+        }
+        if (!o.has("home") || !o.has("away")) return null;
+        return o;
+    }
+
+    /** Détail d'un match : score, minute, fil du match, compos. */
+    static JSONObject summary(String slug, long id, JSONObject base) throws Exception {
+        JSONObject o = get(ESPN + (slug.isEmpty() ? "fra.1" : slug) + "/summary?event=" + id);
+        JSONObject header = o.optJSONObject("header");
+        JSONArray comps = header != null ? header.optJSONArray("competitions") : null;
+        JSONObject comp = comps != null && comps.length() > 0 ? comps.optJSONObject(0) : null;
+        JSONObject m = new JSONObject(base.toString());
+        if (comp != null) {
+            JSONObject ev = new JSONObject();
+            put(ev, "id", String.valueOf(id));
+            put(ev, "competitions", new JSONArray().put(comp));
+            String[] lg = {base.optString("slug"), base.optString("league")};
+            JSONObject s = slimEvent(ev, lg);
+            if (s != null) {
+                for (String k : new String[]{"status", "elapsed", "gh", "ga", "home", "away"}) put(m, k, s.opt(k));
+                if (s.optLong("ts") > 0) put(m, "ts", s.optLong("ts"));
+            }
+        }
+        // Fil du match
+        JSONArray ke = o.optJSONArray("keyEvents");
+        JSONArray evOut = new JSONArray();
+        Pattern clk = Pattern.compile("(\\d+)'?\\s*(?:\\+\\s*(\\d+))?");
+        for (int i = 0; ke != null && i < ke.length(); i++) {
+            JSONObject e = ke.optJSONObject(i);
+            JSONObject type = e.optJSONObject("type");
+            String txt = type != null ? type.optString("text", type.optString("type")) : "";
+            String lower = txt.toLowerCase(Locale.US);
+            String kind, detail;
+            if (lower.contains("own goal")) { kind = "Goal"; detail = "Own Goal"; }
+            else if (lower.contains("penalty") && (lower.contains("miss") || lower.contains("saved"))) { kind = "Goal"; detail = "Missed Penalty"; }
+            else if (lower.contains("penalty") && (lower.contains("scored") || lower.contains("goal"))) { kind = "Goal"; detail = "Penalty"; }
+            else if (lower.startsWith("goal") || e.optBoolean("scoringPlay")) { kind = "Goal"; detail = "Normal Goal"; }
+            else if (lower.contains("red card") || lower.contains("second yellow")) { kind = "Card"; detail = "Red Card"; }
+            else if (lower.contains("yellow card")) { kind = "Card"; detail = "Yellow Card"; }
+            else if (lower.contains("substitution")) { kind = "subst"; detail = "Substitution"; }
+            else if (lower.contains("var")) { kind = "Var"; detail = ""; }
+            else continue;
+            JSONObject clock = e.optJSONObject("clock");
+            int min = 0, extra = 0;
+            Matcher mm = clk.matcher(clock != null ? clock.optString("displayValue") : "");
+            if (mm.find()) {
+                min = Integer.parseInt(mm.group(1));
+                if (mm.group(2) != null) extra = Integer.parseInt(mm.group(2));
+            }
+            JSONArray parts = e.optJSONArray("participants");
+            String p0 = athlete(parts, 0), p1 = athlete(parts, 1);
+            JSONObject tm = e.optJSONObject("team");
+            JSONObject x = new JSONObject();
+            put(x, "min", min);
+            put(x, "extra", extra);
+            put(x, "team", tm != null ? tm.optInt("id") : 0);
+            put(x, "player", p0);
+            put(x, "assist", p1);
+            put(x, "type", kind);
+            put(x, "detail", detail);
+            evOut.put(x);
+        }
+        put(m, "events", evOut);
+        // Compos
+        JSONArray rosters = o.optJSONArray("rosters");
+        JSONArray luOut = new JSONArray();
+        for (int i = 0; rosters != null && i < rosters.length(); i++) {
+            JSONObject r = rosters.optJSONObject(i);
+            JSONArray roster = r.optJSONArray("roster");
+            if (roster == null || roster.length() == 0) continue;
+            JSONObject tm = r.optJSONObject("team");
+            String formation = r.optString("formation", "");
+            List<JSONObject> xi = new ArrayList<>();
+            JSONArray subs = new JSONArray();
+            for (int k = 0; k < roster.length(); k++) {
+                JSONObject pl = roster.optJSONObject(k);
+                JSONObject a = pl.optJSONObject("athlete");
+                JSONObject pos = pl.optJSONObject("position");
+                JSONObject x = new JSONObject();
+                int n = 0;
+                try { n = Integer.parseInt(pl.optString("jersey", "0").trim()); } catch (NumberFormatException ignored) { }
+                put(x, "n", n);
+                put(x, "name", a != null ? a.optString("displayName", a.optString("fullName")) : "");
+                put(x, "pos", pos != null ? pos.optString("abbreviation") : "");
+                put(x, "place", pl.optInt("formationPlace", 0));
+                if (pl.optBoolean("starter")) xi.add(x); else subs.put(x);
+            }
+            if (xi.isEmpty()) continue;
+            gridFromFormation(xi, formation);
+            JSONObject l = new JSONObject();
+            put(l, "team", tm != null ? tm.optInt("id") : 0);
+            put(l, "formation", formation);
+            put(l, "coach", "");
+            put(l, "xi", new JSONArray(xi));
+            put(l, "subs", subs);
+            luOut.put(l);
+        }
+        put(m, "lineups", luOut);
+        return m;
+    }
+
+    static String athlete(JSONArray parts, int i) {
+        if (parts == null || parts.length() <= i) return "";
+        JSONObject a = parts.optJSONObject(i).optJSONObject("athlete");
+        return a != null ? a.optString("displayName", a.optString("fullName")) : "";
+    }
+
+    /** Place les titulaires sur le terrain d'après le système (4-2-3-1…) : grille « ligne:colonne ». */
+    static void gridFromFormation(List<JSONObject> xi, String formation) {
+        String[] parts = formation.split("-");
+        List<Integer> lines = new ArrayList<>();
+        int sum = 1;
+        try {
+            for (String s : parts) { int v = Integer.parseInt(s.trim()); lines.add(v); sum += v; }
+        } catch (NumberFormatException e) {
+            return;
+        }
+        if (lines.isEmpty() || sum != xi.size()) return;
+        boolean hasPlace = true;
+        for (JSONObject x : xi) if (x.optInt("place") <= 0) hasPlace = false;
+        if (hasPlace) Collections.sort(xi, (a, b) -> Integer.compare(a.optInt("place"), b.optInt("place")));
+        // Le gardien en premier
+        for (int i = 0; i < xi.size(); i++) {
+            if ("G".equals(xi.get(i).optString("pos")) || "GK".equals(xi.get(i).optString("pos"))) {
+                xi.add(0, xi.remove(i));
+                break;
+            }
+        }
+        int idx = 0;
+        put(xi.get(idx++), "grid", "1:1");
+        for (int row = 0; row < lines.size(); row++) {
+            for (int col = 1; col <= lines.get(row); col++) put(xi.get(idx++), "grid", (row + 2) + ":" + col);
+        }
+    }
+
+    /** Buteurs et passeurs du LOSC sur la saison, d'après le fil des matchs terminés. */
+    static void scorers(JSONObject d, String team) {
+        JSONArray fx = d.optJSONArray("fixtures");
+        JSONObject done = d.optJSONObject("scorerMatches");
+        if (done == null) done = new JSONObject();
+        JSONObject tally = d.optJSONObject("scorerTally");
+        if (tally == null) tally = new JSONObject();
+        int teamId = Integer.parseInt(team);
+        int fetched = 0;
+        for (int i = 0; fx != null && i < fx.length() && fetched < 5; i++) {
+            JSONObject f = fx.optJSONObject(i);
+            if (!DONE.contains(f.optString("status"))) continue;
+            String id = String.valueOf(f.optLong("id"));
+            if (done.has(id)) continue;
+            try {
+                JSONObject m = summary(f.optString("slug"), f.optLong("id"), f);
+                fetched++;
+                JSONArray ev = m.optJSONArray("events");
+                for (int k = 0; ev != null && k < ev.length(); k++) {
+                    JSONObject e = ev.optJSONObject(k);
+                    if (!"Goal".equals(e.optString("type")) || e.optInt("team") != teamId) continue;
+                    String det = e.optString("detail");
+                    if ("Own Goal".equals(det) || "Missed Penalty".equals(det)) continue;
+                    bump(tally, e.optString("player"), 0);
+                    if (!e.optString("assist").isEmpty()) bump(tally, e.optString("assist"), 1);
+                }
+                put(done, id, true);
+            } catch (Exception ignored) {
+                break;
+            }
+        }
+        put(d, "scorerMatches", done);
+        put(d, "scorerTally", tally);
+        List<JSONObject> list = new ArrayList<>();
+        for (java.util.Iterator<String> it = tally.keys(); it.hasNext(); ) {
+            String name = it.next();
+            JSONArray v = tally.optJSONArray(name);
+            JSONObject o = new JSONObject();
+            put(o, "name", name);
+            put(o, "goals", v != null ? v.optInt(0) : 0);
+            put(o, "assists", v != null ? v.optInt(1) : 0);
+            put(o, "team", "Lille");
+            put(o, "teamId", teamId);
+            if (o.optInt("goals") > 0) list.add(o);
+        }
+        Collections.sort(list, (a, b) -> a.optInt("goals") != b.optInt("goals") ? b.optInt("goals") - a.optInt("goals") : b.optInt("assists") - a.optInt("assists"));
+        put(d, "scorers", new JSONArray(list.size() > 12 ? list.subList(0, 12) : list));
+        put(d, "scorersCount", done.length());
+    }
+
+    static void bump(JSONObject tally, String name, int idx) {
+        if (name == null || name.isEmpty()) return;
+        JSONArray v = tally.optJSONArray(name);
+        if (v == null) { v = new JSONArray(); v.put(0); v.put(0); put(tally, name, v); }
+        try { v.put(idx, v.optInt(idx) + 1); } catch (JSONException ignored) { }
     }
 
     /** Prochain match à suivre : celui en cours, sinon le premier à venir (on garde un match commencé il y a moins de 3 h). */
@@ -440,101 +665,15 @@ final class Losc {
         return null;
     }
 
-    static JSONObject slimFixture(JSONObject it) {
-        JSONObject o = new JSONObject();
-        JSONObject f = it.optJSONObject("fixture");
-        JSONObject l = it.optJSONObject("league");
-        JSONObject t = it.optJSONObject("teams");
-        JSONObject g = it.optJSONObject("goals");
-        if (f != null) {
-            put(o, "id", f.optLong("id"));
-            put(o, "ts", f.optLong("timestamp"));
-            JSONObject st = f.optJSONObject("status");
-            put(o, "status", st != null ? st.optString("short") : "");
-            put(o, "elapsed", st != null && !st.isNull("elapsed") ? st.optInt("elapsed") : -1);
-            JSONObject v = f.optJSONObject("venue");
-            put(o, "venue", v != null && !v.isNull("name") ? v.optString("name") : "");
-            put(o, "city", v != null && !v.isNull("city") ? v.optString("city") : "");
-        }
-        if (l != null) {
-            put(o, "league", l.optString("name"));
-            put(o, "leagueId", l.optInt("id"));
-            put(o, "round", l.isNull("round") ? "" : l.optString("round"));
-        }
-        if (t != null) {
-            put(o, "home", team(t.optJSONObject("home")));
-            put(o, "away", team(t.optJSONObject("away")));
-        }
-        put(o, "gh", g != null && !g.isNull("home") ? g.optInt("home") : -1);
-        put(o, "ga", g != null && !g.isNull("away") ? g.optInt("away") : -1);
-        return o;
-    }
-
-    static JSONObject team(JSONObject t) {
-        JSONObject o = new JSONObject();
-        if (t == null) return o;
-        put(o, "id", t.optInt("id"));
-        put(o, "name", t.optString("name"));
-        return o;
-    }
-
-    static JSONObject slimMatch(JSONObject it) {
-        JSONObject o = slimFixture(it);
-        JSONArray ev = it.optJSONArray("events");
-        JSONArray evOut = new JSONArray();
-        for (int i = 0; ev != null && i < ev.length(); i++) {
-            JSONObject e = ev.optJSONObject(i);
-            JSONObject time = e.optJSONObject("time");
-            JSONObject tm = e.optJSONObject("team");
-            JSONObject pl = e.optJSONObject("player");
-            JSONObject as = e.optJSONObject("assist");
-            JSONObject x = new JSONObject();
-            put(x, "min", time != null && !time.isNull("elapsed") ? time.optInt("elapsed") : 0);
-            put(x, "extra", time != null && !time.isNull("extra") ? time.optInt("extra") : 0);
-            put(x, "team", tm != null ? tm.optInt("id") : 0);
-            put(x, "player", pl != null && !pl.isNull("name") ? pl.optString("name") : "");
-            put(x, "assist", as != null && !as.isNull("name") ? as.optString("name") : "");
-            put(x, "type", e.optString("type"));
-            put(x, "detail", e.isNull("detail") ? "" : e.optString("detail"));
-            evOut.put(x);
-        }
-        put(o, "events", evOut);
-        JSONArray lu = it.optJSONArray("lineups");
-        JSONArray luOut = new JSONArray();
-        for (int i = 0; lu != null && i < lu.length(); i++) {
-            JSONObject l = lu.optJSONObject(i);
-            JSONObject x = new JSONObject();
-            JSONObject tm = l.optJSONObject("team");
-            JSONObject coach = l.optJSONObject("coach");
-            put(x, "team", tm != null ? tm.optInt("id") : 0);
-            put(x, "formation", l.isNull("formation") ? "" : l.optString("formation"));
-            put(x, "coach", coach != null && !coach.isNull("name") ? coach.optString("name") : "");
-            put(x, "xi", players(l.optJSONArray("startXI")));
-            put(x, "subs", players(l.optJSONArray("substitutes")));
-            luOut.put(x);
-        }
-        put(o, "lineups", luOut);
-        return o;
-    }
-
-    static JSONArray players(JSONArray a) {
-        JSONArray out = new JSONArray();
-        for (int i = 0; a != null && i < a.length(); i++) {
-            JSONObject pl = a.optJSONObject(i).optJSONObject("player");
-            if (pl == null) continue;
-            JSONObject x = new JSONObject();
-            put(x, "n", pl.isNull("number") ? 0 : pl.optInt("number"));
-            put(x, "name", pl.optString("name"));
-            put(x, "pos", pl.isNull("pos") ? "" : pl.optString("pos"));
-            put(x, "grid", pl.isNull("grid") ? "" : pl.optString("grid"));
-            out.put(x);
-        }
-        return out;
-    }
-
     /* ------------------------------------------------------------------ actus */
 
     static final String[] NEWS_QUERIES = { "LOSC", "\"Lille OSC\" OR \"les Dogues\"" };
+
+    static String utcDay() {
+        SimpleDateFormat f = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
+        f.setTimeZone(TimeZone.getTimeZone("UTC"));
+        return f.format(System.currentTimeMillis());
+    }
 
     static void fetchNews(Context c, JSONObject d, SharedPreferences p) throws Exception {
         JSONArray old = d.optJSONArray("news");
@@ -636,7 +775,6 @@ final class Losc {
         String score = name(neu, "home") + " " + goals(neu, "gh") + " – " + goals(neu, "ga") + " " + name(neu, "away");
         long id = neu.optLong("id");
 
-        // Compo officielle
         if (p.getBoolean("notifLineup", true)) {
             boolean had = old != null && old.optJSONArray("lineups") != null && old.optJSONArray("lineups").length() > 0;
             JSONArray lu = neu.optJSONArray("lineups");
@@ -651,7 +789,7 @@ final class Losc {
                         b.append(xi.optJSONObject(k).optString("name"));
                     }
                     String f = l.optString("formation");
-                    notify(c, "match", (int) (id * 10 + 1), "Compo officielle" + (f.isEmpty() ? "" : " (" + f + ")"), b.toString());
+                    notify(c, "match", (int) (id % 100000 * 10 + 1), "Compo officielle" + (f.isEmpty() ? "" : " (" + f + ")"), b.toString());
                     p.edit().putBoolean("lineupSent" + id, true).apply();
                 }
             }
@@ -659,7 +797,6 @@ final class Losc {
 
         if (!p.getBoolean("notifGoals", true)) return;
 
-        // Buts (on ne notifie pas l'historique au premier relevé)
         if (old != null) {
             int before = countGoals(old), after = countGoals(neu);
             int scoreBefore = Math.max(0, old.optInt("gh")) + Math.max(0, old.optInt("ga"));
@@ -674,20 +811,18 @@ final class Losc {
                     seen++;
                     if (seen <= before) continue;
                     boolean ours = e.optInt("team") == team;
-                    String who = e.optString("player");
                     String min = e.optInt("min") + (e.optInt("extra") > 0 ? "+" + e.optInt("extra") : "") + "'";
                     String kind = "Own Goal".equals(e.optString("detail")) ? " (csc)" : "Penalty".equals(e.optString("detail")) ? " (pen.)" : "";
-                    notify(c, "match", (int) (id * 100 + 10 + seen), (ours ? "BUT pour Lille ! " : "But adverse · ") + score, min + " " + who + kind);
+                    notify(c, "match", (int) (id % 100000 * 100 + 10 + seen), (ours ? "BUT pour Lille ! " : "But adverse · ") + score, min + " " + e.optString("player") + kind);
                     any = true;
                 }
-                if (!any && scoreAfter > scoreBefore) notify(c, "match", (int) (id * 100 + 10 + scoreAfter), "But ! " + score, "");
+                if (!any && scoreAfter > scoreBefore) notify(c, "match", (int) (id % 100000 * 100 + 10 + scoreAfter), "But ! " + score, "");
             }
         }
 
-        // Score final
         boolean wasDone = old != null && DONE.contains(old.optString("status"));
         if (!wasDone && DONE.contains(neu.optString("status")) && !p.getBoolean("ftSent" + id, false)) {
-            notify(c, "match", (int) (id * 10 + 3), "Score final", score);
+            notify(c, "match", (int) (id % 100000 * 10 + 3), "Score final", score);
             p.edit().putBoolean("ftSent" + id, true).apply();
         }
     }
@@ -736,7 +871,7 @@ final class Losc {
                 .setContentTitle(title)
                 .setContentText(text)
                 .setStyle(new Notification.BigTextStyle().bigText(text))
-                .setColor(0xFFE2001A)
+                .setColor(0xFFD6102A)
                 .setAutoCancel(true)
                 .setContentIntent(pi);
         nm.notify(id, b.build());

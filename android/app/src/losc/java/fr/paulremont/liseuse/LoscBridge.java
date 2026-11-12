@@ -37,25 +37,13 @@ class LoscBridge {
     public String settings() {
         SharedPreferences p = prefs();
         JSONObject o = new JSONObject();
-        String key = p.getString("key", "");
-        Losc.put(o, "hasKey", !key.isEmpty());
-        Losc.put(o, "keyHint", key.length() > 4 ? "••••" + key.substring(key.length() - 4) : "");
         Losc.put(o, "notifGoals", p.getBoolean("notifGoals", true));
         Losc.put(o, "notifLineup", p.getBoolean("notifLineup", true));
         Losc.put(o, "notifNews", p.getBoolean("notifNews", true));
         boolean allowed = Build.VERSION.SDK_INT < 33
                 || c.checkSelfPermission("android.permission.POST_NOTIFICATIONS") == PackageManager.PERMISSION_GRANTED;
         Losc.put(o, "notifAllowed", allowed);
-        Losc.put(o, "budget", Losc.budget(p));
         return o.toString();
-    }
-
-    @JavascriptInterface
-    public void setKey(String key) {
-        String k = key == null ? "" : key.trim();
-        if (!k.matches("[A-Za-z0-9]{0,64}")) return;
-        prefs().edit().putString("key", k).remove("apiErrAt").remove("team").apply();
-        TickWorker.refreshNow(c);
     }
 
     @JavascriptInterface

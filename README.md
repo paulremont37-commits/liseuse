@@ -50,8 +50,10 @@ Le programme PC n'exécute que des raccourcis clavier et des touches multimédia
 
 ## Dogues (appli de fan LOSC, non officielle)
 
-`dogues.apk` : actus du LOSC (titres de Google Actualités, mis à jour toutes les 10 min), prochain match avec compte à rebours, direct (score, buts, cartons, changements), compo officielle, absents, calendrier, classement de Ligue 1, buteurs et effectif. Notifications pour les buts, le score final, la compo et les grosses actus.
+`dogues.apk` : actus du LOSC (titres de Google Actualités, mis à jour toutes les 10 min), prochain match avec compte à rebours, direct (score, buts, cartons, changements), compo officielle, calendrier, classement de Ligue 1, buteurs du LOSC et effectif. Notifications pour les buts, le score final, la compo et les grosses actus.
 
-Les données de matchs viennent d'API-Football : crée un compte gratuit sur dashboard.api-football.com et colle ta clé dans les réglages de l'appli. La clé reste sur le téléphone, elle n'est jamais dans ce repo. Le quota gratuit est de 100 requêtes par jour ; l'appli les répartit pour en garder assez pour suivre les matchs en direct.
+Les données de matchs viennent de l'API publique d'ESPN : gratuit, sans compte ni clé. Mise à jour toutes les 10 min, toutes les 4 min autour d'un match, toutes les 2 min pendant. Aucune source gratuite ne donne les blessés : l'infirmerie reprend les actus taguées blessure ou suspension.
+
+Les articles s'ouvrent en mode lecture : la page du média est chargée en coulisse, le texte est extrait avec [Readability](https://github.com/mozilla/readability) de Mozilla (licence Apache 2.0, `losc/lib/`) puis remis en page sans pubs. Les articles réservés aux abonnés ne sont pas extraits : ils restent sur le site du média.
 
 Aucun logo ni élément officiel du club n'est utilisé.
