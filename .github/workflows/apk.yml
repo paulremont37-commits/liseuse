@@ -8,6 +8,7 @@ on:
       - 'agent/**'
       - 'web/**'
       - 'deck/**'
+      - 'losc/**'
       - '.github/workflows/apk.yml'
   workflow_dispatch:
 
@@ -29,13 +30,21 @@ jobs:
         with:
           gradle-version: '8.7'
 
-      - name: Compiler les deux APK
-        run: gradle -p android assembleRelease --no-daemon --stacktrace
+      - name: Compiler les APK
+        run: |
+          set -o pipefail
+          gradle -p android assembleRelease --no-daemon 2>&1 | tee build.log
+
+      - name: Erreurs de compilation
+        if: failure()
+        run: |
+          grep -E "error:|e: |What went wrong|Could not|> " build.log | head -40 | while IFS= read -r l; do echo "::error::$l"; done
 
       - name: Renommer
         run: |
           cp android/app/build/outputs/apk/liseuse/release/app-liseuse-release.apk liseuse.apk
           cp android/app/build/outputs/apk/deck/release/app-deck-release.apk stream-deck.apk
+          cp android/app/build/outputs/apk/losc/release/app-losc-release.apk dogues.apk
 
       - uses: actions/upload-artifact@v4
         with:
@@ -43,6 +52,7 @@ jobs:
           path: |
             liseuse.apk
             stream-deck.apk
+            dogues.apk
 
   pc:
     runs-on: windows-latest
@@ -80,8 +90,10 @@ jobs:
           files: |
             liseuse.apk
             stream-deck.apk
+            dogues.apk
             StreamDeckPC.exe
           body: |
             - **liseuse.apk** : la liseuse (mangas, BD, livres), pour la tablette.
             - **stream-deck.apk** : le Stream Deck, pour la tablette.
             - **StreamDeckPC.exe** : le programme à lancer sur le PC pour le Stream Deck.
+            - **dogues.apk** : l'appli de fan LOSC (non officielle) : actus, matchs en direct, compos, absents, classement.

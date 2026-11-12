@@ -6,6 +6,7 @@ on:
     paths:
       - 'web/**'
       - 'deck/**'
+      - 'losc/**'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
@@ -31,8 +32,9 @@ jobs:
         run: |
           mkdir site
           cp -r web/. site/
-          mkdir site/deck
+          mkdir site/deck site/losc
           cp -r deck/. site/deck/
+          cp -r losc/. site/losc/
           python3 - <<'EOF'
           import os, json
           sha = os.environ["GITHUB_SHA"][:7]
@@ -45,7 +47,8 @@ jobs:
               json.dump({"version": sha, "files": files}, open(os.path.join(folder, "version.json"), "w"))
               print(folder, len(files), "fichiers")
           write("site/deck")
-          write("site", skip=("deck/",))
+          write("site/losc")
+          write("site", skip=("deck/", "losc/"))
           EOF
 
       - uses: actions/configure-pages@v5

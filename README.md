@@ -47,3 +47,11 @@ La même coque fait aussi un Stream Deck : la tablette devient une grille de gro
 3. Pour assigner un bouton dans Discord, Voicemod ou Medal : clique sur le champ du raccourci dans le logiciel, puis appuie sur le bouton de la tablette.
 
 Le programme PC n'exécute que des raccourcis clavier et des touches multimédia : aucune commande ni aucun fichier ne peut être lancé depuis la tablette, et il faut le code pour s'y connecter.
+
+## Dogues (appli de fan LOSC, non officielle)
+
+`dogues.apk` : actus du LOSC (titres de Google Actualités, mis à jour toutes les 10 min), prochain match avec compte à rebours, direct (score, buts, cartons, changements), compo officielle, absents, calendrier, classement de Ligue 1, buteurs et effectif. Notifications pour les buts, le score final, la compo et les grosses actus.
+
+Les données de matchs viennent d'API-Football : crée un compte gratuit sur dashboard.api-football.com et colle ta clé dans les réglages de l'appli. La clé reste sur le téléphone, elle n'est jamais dans ce repo. Le quota gratuit est de 100 requêtes par jour ; l'appli les répartit pour en garder assez pour suivre les matchs en direct.
+
+Aucun logo ni élément officiel du club n'est utilisé.

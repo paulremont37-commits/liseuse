@@ -77,7 +77,7 @@ public class MainActivity extends Activity {
         store = new WebStore(this);
 
         root = new FrameLayout(this);
-        root.setBackgroundColor(0xFF15141C);
+        root.setBackgroundColor(getColor(R.color.ink));
         setContentView(root);
         try {
             web = new WebView(this);
@@ -86,7 +86,7 @@ public class MainActivity extends Activity {
             showRescue("Le composant qui affiche les pages (Android System WebView) est absent ou désactivé.");
             return;
         }
-        web.setBackgroundColor(0xFF15141C);
+        web.setBackgroundColor(getColor(R.color.ink));
         root.addView(web, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
         WebSettings s = web.getSettings();
@@ -100,6 +100,7 @@ public class MainActivity extends Activity {
         s.setMediaPlaybackRequiresUserGesture(true);
 
         web.addJavascriptInterface(new Bridge(), "Android");
+        FlavorHooks.attach(this, web);
 
         web.setWebViewClient(new WebViewClient() {
             @Override
@@ -292,8 +293,14 @@ public class MainActivity extends Activity {
     /** Bouton retour : l'interface décide (fermer le lecteur, une fenêtre…). Un écran d'accueil ne se ferme jamais. */
     @Override
     public void onBackPressed() {
-        if (web == null) return;
-        web.evaluateJavascript("(window.liseuseBack && window.liseuseBack()) ? 1 : 0", null);
+        if (web == null) {
+            if (!FlavorHooks.isHome()) super.onBackPressed();
+            return;
+        }
+        // L'interface décide (fermer une fenêtre…). Un écran d'accueil ne se ferme jamais ; les autres applis, oui.
+        web.evaluateJavascript("(window.liseuseBack && window.liseuseBack()) ? 1 : 0", v -> {
+            if (!"1".equals(v) && !FlavorHooks.isHome()) finish();
+        });
     }
 
     /** Bouton d'accueil pressé alors que la liseuse est déjà ouverte : retour à la bibliothèque. */
@@ -310,6 +317,7 @@ public class MainActivity extends Activity {
         super.onResume();
         if (web == null) return;
         web.onResume();
+        FlavorHooks.onResume(this);
         hideSystemBars();
         if (System.currentTimeMillis() - lastCheck > CHECK_EVERY_MS) checkForUpdate();
     }
@@ -329,6 +337,7 @@ public class MainActivity extends Activity {
     /** Plein écran façon liseuse : barres système cachées, un glissement depuis le bord les fait réapparaître. */
     @SuppressWarnings("deprecation")
     private void hideSystemBars() {
+        if (!FlavorHooks.immersive()) return;
         if (Build.VERSION.SDK_INT >= 30) {
             getWindow().setDecorFitsSystemWindows(false);
             WindowInsetsController c = getWindow().getInsetsController();
