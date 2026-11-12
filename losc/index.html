@@ -524,9 +524,9 @@ function viewNews() {
   const [une, ...rest] = list;
   return `<div class="filters"><button class="f" data-nf="all" aria-pressed="${newsFilter === "all"}">Tout</button>${tags.map(t => `<button class="f" data-nf="${t}" aria-pressed="${newsFilter === t}">${t}</button>`).join("")}</div>
     ${err ? `<p class="meta">${esc(err)} Dernières actus connues :</p>` : ""}
-    ${une ? `<a class="une${isNew(une) ? " new" : ""}" href="${esc(une.link)}" target="_blank" rel="noopener">${kick(une)}<h2>${esc(une.title)}</h2><div class="meta"><b>${esc(une.source)}</b> · ${esc(ago(une.pub))}</div></a>` : `<p class="meta">Rien dans cette rubrique.</p>`}
-    <div class="cols">${rest.slice(0, 60).map(n => `<a class="art${isNew(n) ? " new" : ""}" href="${esc(n.link)}" target="_blank" rel="noopener">${kick(n)}<h3>${esc(n.title)}</h3><div class="meta"><b>${esc(n.source)}</b> · ${esc(ago(n.pub))}</div></a>`).join("")}</div>
-    <p class="note">Titres issus de Google Actualités, mis à jour toutes les 10 minutes. L'article s'ouvre sur le site du média.</p>`;
+    ${une ? `<a class="une${isNew(une) ? " new" : ""}" href="${esc(une.link)}" data-src="${esc(une.source)}" target="_blank" rel="noopener">${kick(une)}<h2>${esc(une.title)}</h2><div class="meta"><b>${esc(une.source)}</b> · ${esc(ago(une.pub))}</div></a>` : `<p class="meta">Rien dans cette rubrique.</p>`}
+    <div class="cols">${rest.slice(0, 60).map(n => `<a class="art${isNew(n) ? " new" : ""}" href="${esc(n.link)}" data-src="${esc(n.source)}" target="_blank" rel="noopener">${kick(n)}<h3>${esc(n.title)}</h3><div class="meta"><b>${esc(n.source)}</b> · ${esc(ago(n.pub))}</div></a>`).join("")}</div>
+    <p class="note">Titres issus de Google Actualités, mis à jour toutes les 10 minutes. L'article s'ouvre dans l'appli.</p>`;
 }
 function fxRow(f, isNext) {
   const opp = isUs(f.home) ? f.away : f.home;
@@ -609,6 +609,8 @@ function markSeen() { if (D.news && D.news.length) { lastSeenNews = Math.max(...
 
 document.addEventListener("click", e => {
   const t = e.target;
+  const art = t.closest("a[data-src]");
+  if (art && NATIVE && NATIVE.openArticle) { e.preventDefault(); NATIVE.openArticle(art.href, art.dataset.src || ""); return; }
   const tb = t.closest("[data-tab]"); if (tb) { if (tab === "news") markSeen(); tab = tb.dataset.tab; try { localStorage.setItem("dogues.tab", tab); } catch (x) {} renderTabs(); renderPanel(); $("#panel").scrollTop = 0; return; }
   const nf = t.closest("[data-nf]"); if (nf) { newsFilter = nf.dataset.nf; renderPanel(); return; }
   const pr = t.closest("[data-pref]");

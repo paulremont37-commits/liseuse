@@ -64,6 +64,17 @@ class LoscBridge {
         prefs().edit().putBoolean(name, value).apply();
     }
 
+    /** Ouvre un article dans l'appli (page du média, sous le bandeau Dogues). */
+    @JavascriptInterface
+    public void openArticle(String url, String source) {
+        if (url == null || !(url.startsWith("https://") || url.startsWith("http://"))) return;
+        Intent i = new Intent(c, ArticleActivity.class)
+                .putExtra("url", url)
+                .putExtra("source", source == null ? "" : source)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        c.startActivity(i);
+    }
+
     @JavascriptInterface
     public void openNotifSettings() {
         Intent i;
