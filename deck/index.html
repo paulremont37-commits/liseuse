@@ -230,10 +230,15 @@ function openSocket(url) {
   }
   return new WebSocket(url);
 }
-const C = { ws: null, state: "off", name: "", retry: 0, timer: 0, pending: new Map(), seq: 1, lastErr: "" };
+const C = { ws: null, state: "off", name: "", retry: 0, timer: 0, pending: new Map(), seq: 1, lastErr: "", rtt: 0, pings: new Map() };
 function setStatus(state, txt) {
   C.state = state; const el = $("#status"); el.className = "status " + ({ on: "on", wait: "wait", err: "err" }[state] || "");
   $("#statusTxt").textContent = txt;
+}
+// Temps aller-retour tablette → PC, affiché à côté du nom du PC
+function noteRtt(ms) {
+  C.rtt = C.rtt ? Math.round(C.rtt * 0.6 + ms * 0.4) : Math.round(ms);
+  if (C.state === "on") $("#statusTxt").textContent = `${C.name} connecté · ${Math.max(1, C.rtt)} ms`;
 }
 function connect() {
   clearTimeout(C.timer);
@@ -245,7 +250,8 @@ function connect() {
   ws.onopen = () => ws.send(JSON.stringify({ type: "hello", code: st.code }));
   ws.onmessage = ev => {
     let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
-    if (m.type === "ok") { C.retry = 0; C.name = m.name || "PC"; C.lastErr = ""; setStatus("on", C.name + " connecté"); if (!$("#setup").hidden) showDeck(); }
+    if (m.type === "ok") { C.retry = 0; C.name = m.name || "PC"; C.lastErr = ""; C.rtt = 0; setStatus("on", C.name + " connecté"); if (!$("#setup").hidden) showDeck(); ping(); }
+    else if (m.type === "pong") { const t0 = C.pings.get(m.id); if (t0) { C.pings.delete(m.id); noteRtt(performance.now() - t0); } }
     else if (m.type === "error") { C.lastErr = m.reason || "refusé"; setStatus("err", "Code refusé"); if (!$("#setup").hidden) $("#setErr").textContent = "Le PC a refusé : " + C.lastErr + "."; ws.onclose = null; try { ws.close(); } catch (e) {} C.ws = null; }
     else if (m.type === "result") { const p = C.pending.get(m.id); if (p) { C.pending.delete(m.id); p(m.ok, m.reason); } }
   };
@@ -259,12 +265,20 @@ function later() {
 function sendKeys(keys, label) {
   return new Promise(res => {
     if (C.state !== "on" || !C.ws) return res({ ok: false, reason: "PC non connecté" });
-    const id = C.seq++; const t = setTimeout(() => { C.pending.delete(id); res({ ok: false, reason: "pas de réponse du PC" }); }, 2500);
-    C.pending.set(id, (ok, reason) => { clearTimeout(t); res({ ok, reason }); });
+    const id = C.seq++; const t0 = performance.now();
+    // Envoi en premier : rien ne doit passer avant le message
     C.ws.send(JSON.stringify({ type: "press", id, keys, label }));
+    const t = setTimeout(() => { C.pending.delete(id); res({ ok: false, reason: "pas de réponse du PC" }); }, 2500);
+    C.pending.set(id, (ok, reason) => { clearTimeout(t); noteRtt(performance.now() - t0); res({ ok, reason }); });
   });
 }
-setInterval(() => { if (C.state === "on" && C.ws) try { C.ws.send(JSON.stringify({ type: "ping" })); } catch (e) {} }, 15000);
+function ping() {
+  if (C.state !== "on" || !C.ws) return;
+  const id = C.seq++; C.pings.set(id, performance.now()); if (C.pings.size > 20) C.pings.clear();
+  try { C.ws.send(JSON.stringify({ type: "ping", id })); } catch (e) {}
+}
+// Un petit message régulier garde la connexion (et le Wi-Fi) éveillés entre deux appuis
+setInterval(ping, 5000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden && C.state !== "on" && st.pc) connect(); });
 
 /* ---------------- rendu ---------------- */
@@ -301,29 +315,33 @@ function showSetup(msg) {
 }
 
 /* ---------------- appuis ---------------- */
-let pressT = 0, longDone = false;
 const grid = $("#grid");
+// Le raccourci part dès que le doigt touche le bouton (pas au relâchement) : on gagne le temps d'appui.
 grid.addEventListener("pointerdown", e => {
   const el = e.target.closest(".tile"); if (!el || el.classList.contains("add")) return;
-  el.classList.add("down"); longDone = false;
-  const t = findTile(el.dataset.tile);
-  if (!editing && t && t.toggle) pressT = setTimeout(() => { longDone = true; el.classList.remove("down"); st.states[t.id] = !st.states[t.id]; save(); renderGrid(); toast("État corrigé, rien n'a été envoyé."); }, 700);
+  if (e.pointerType === "mouse" && e.button !== 0) return;
+  el.classList.add("down");
+  if (editing) return;
+  const t = findTile(el.dataset.tile); if (t) press(t);
 });
-["pointerup", "pointercancel", "pointerleave"].forEach(ev => grid.addEventListener(ev, e => { clearTimeout(pressT); const el = e.target.closest && e.target.closest(".tile"); if (el) el.classList.remove("down"); }, true));
-grid.addEventListener("click", async e => {
+["pointerup", "pointercancel", "pointerleave"].forEach(ev => grid.addEventListener(ev, e => { const el = e.target.closest && e.target.closest(".tile"); if (el) el.classList.remove("down"); }, true));
+grid.addEventListener("click", e => {
   const el = e.target.closest(".tile"); if (!el) return;
   if (el.dataset.act === "add-tile") return openEditor(null);
   const t = findTile(el.dataset.tile); if (!t) return;
   if (editing) return openEditor(t);
-  if (longDone) { longDone = false; return; }
+  if (e.detail === 0) press(t); // clavier ou accessibilité : pas de pointerdown
+});
+async function press(t) {
+  const sent = sendKeys(t.keys, t.label); // part tout de suite
   try { navigator.vibrate && navigator.vibrate(12); } catch (x) {}
-  const r = await sendKeys(t.keys, t.label);
+  const r = await sent;
   const el2 = grid.querySelector(`[data-tile="${t.id}"]`);
   if (r.ok && t.toggle) { st.states[t.id] = !st.states[t.id]; save(); renderGrid(); }
   const cur = grid.querySelector(`[data-tile="${t.id}"]`) || el2;
   if (cur) { cur.classList.remove("ok", "fail"); void cur.offsetWidth; cur.classList.add(r.ok ? "ok" : "fail"); }
   if (!r.ok) toast(r.reason === "PC non connecté" ? "PC non connecté. Vérifie que Stream Deck PC est ouvert." : `Échec : ${r.reason}.`);
-});
+}
 function findTile(id) { for (const p of st.pages) for (const t of p.tiles) if (t.id === id) return t; return null; }
 
 /* ---------------- éditeur ---------------- */
@@ -348,6 +366,7 @@ function drawEditor(confirmDel) {
     <div class="preview">${esc(describe(d.keys))}</div>
     <div class="toggle-row" style="margin-top:16px"><div>Bouton à état<small>Pour couper/réactiver : le bouton reste allumé tant que c'est actif.</small></div><button class="switch" role="switch" data-act="toggle" aria-checked="${!!d.toggle}" aria-label="Bouton à état"></button></div>
     ${d.toggle ? `<label class="field"><span>Texte quand c'est actif</span><input id="eOn" maxlength="14" value="${esc(d.onLabel || "")}"></label>` : ""}
+    ${d.toggle && !d.isNew ? `<div class="toggle-row"><div>Affichage actuel : ${st.states[d.id] ? esc(d.onLabel || "Actif") : "inactif"}<small>À corriger si le bouton ne correspond plus à la réalité. Rien n'est envoyé au PC.</small></div><button class="btn" data-act="flip-state">${st.states[d.id] ? "Afficher inactif" : "Afficher actif"}</button></div>` : ""}
     ${confirmDel ? `<div class="confirm"><span>Supprimer « ${esc(d.label)} » ?</span><button class="btn" data-act="keep">Garder</button><button class="btn danger solid" data-act="del-yes">Supprimer</button></div>` : ""}
     <div class="foot">${d.isNew ? "" : `<button class="btn danger left" data-act="del">Supprimer</button>`}<button class="btn" data-act="test">Tester</button><button class="btn" data-act="close">Annuler</button><button class="btn primary" data-act="save-tile">Enregistrer</button></div>
   </div></div>`;
@@ -406,7 +425,7 @@ function openGuide() {
       <li>Réglages → <b>Colonnes</b> pour des boutons plus grands ou plus petits.</li></ul></div></details>
     <details><summary>7. Astuces</summary><div class="gbody"><ul>
       <li>Les boutons envoient des touches comme <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>F13</kbd> qui n'existent pas sur ton clavier : aucun conflit avec Rocket League, et ça marche en pleine partie.</li>
-      <li>Si un bouton affiche « Coupé » alors que ce n'est plus le cas, fais un <b>appui long</b> dessus : l'affichage se corrige sans rien envoyer.</li>
+      <li>Si un bouton affiche « Coupé » alors que ce n'est plus le cas : <b>Modifier</b>, touche le bouton, puis <b>Afficher inactif</b>. L'affichage se corrige sans rien envoyer.</li>
       <li>Les boutons de la page <b>Musique & PC</b> contrôlent Spotify, YouTube ou ton lecteur sans rien régler.</li></ul></div></details>
     <details><summary>Ça ne marche pas ?</summary><div class="gbody"><ul>
       <li><b>Rond orange ou « PC introuvable »</b> : vérifie que StreamDeckPC est ouvert sur le PC et que les deux appareils sont sur le même Wi-Fi. Si l'adresse affichée par le PC a changé, mets-la à jour dans Réglages → PC.</li>
@@ -438,6 +457,7 @@ document.addEventListener("click", async e => {
   if (act === "scrim" && t !== a) return;
   if (act === "scrim" || act === "close") { $("#sheetRoot").innerHTML = ""; draft = null; return; }
   if (act === "toggle") { readDraft(); draft.toggle = !draft.toggle; drawEditor(); }
+  if (act === "flip-state") { readDraft(); st.states[draft.id] = !st.states[draft.id]; save(); renderGrid(); drawEditor(); }
   else if (act === "test") { readDraft(); const r = await sendKeys(draft.keys, draft.label); toast(r.ok ? `Envoyé : ${describe(draft.keys)}` : `Échec : ${r.reason}.`); drawEditor(); }
   else if (act === "save-tile") {
     readDraft(); const isNew = draft.isNew; delete draft.isNew;

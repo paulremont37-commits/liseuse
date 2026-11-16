@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Garder le Wi-Fi en mode faible latence pendant que le Stream Deck est à l'écran -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <application>
         <activity android:name=".MainActivity" android:exported="true">
             <!-- Peut devenir l'écran d'accueil de la tablette -->

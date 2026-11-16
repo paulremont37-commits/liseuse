@@ -162,6 +162,41 @@ def set_autostart(on):
         os.remove(f)
     return True
 
+# --------------------------------------------------------------------------- latence
+
+def no_delay(ws):
+    """TCP_NODELAY : les petits messages partent tout de suite (déjà le cas par défaut avec asyncio)."""
+    try:
+        sock = ws.transport.get_extra_info("socket")
+        if sock is not None:
+            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+    except (OSError, AttributeError):
+        pass
+
+
+def tune_windows():
+    """Réglages Windows pour que les appuis passent sans attendre."""
+    if sys.platform != "win32":
+        return
+    import ctypes
+    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    # 1. Désactive la « sélection rapide » de la console : un clic dans la fenêtre
+    #    mettait le programme en pause (et les appuis en attente) jusqu'à la touche Entrée.
+    try:
+        h = k32.GetStdHandle(-10)  # STD_INPUT_HANDLE
+        mode = ctypes.c_uint32()
+        if k32.GetConsoleMode(h, ctypes.byref(mode)):
+            ENABLE_QUICK_EDIT, ENABLE_EXTENDED_FLAGS = 0x0040, 0x0080
+            k32.SetConsoleMode(h, (mode.value & ~ENABLE_QUICK_EDIT) | ENABLE_EXTENDED_FLAGS)
+    except OSError:
+        pass
+    # 2. Priorité « supérieure à la normale » : passe devant les tâches de fond quand un jeu charge le processeur.
+    try:
+        ABOVE_NORMAL_PRIORITY_CLASS = 0x8000
+        k32.SetPriorityClass(k32.GetCurrentProcess(), ABOVE_NORMAL_PRIORITY_CLASS)
+    except OSError:
+        pass
+
 # --------------------------------------------------------------------------- serveur
 
 CODE = None
@@ -184,6 +219,7 @@ async def handler(ws):
         await ws.send(json.dumps({"type": "error", "reason": "code incorrect"}))
         return
     FAILS.pop(ip, None)
+    no_delay(ws)
     await ws.send(json.dumps({"type": "ok", "name": socket.gethostname(), "version": 1}))
     log(f"Tablette connectée ({ip})")
     try:
@@ -202,8 +238,9 @@ async def handler(ws):
                     continue
                 try:
                     send_keys(keys)
-                    log(f"{label or 'Bouton'} → {describe(keys)}")
+                    # Réponse d'abord, journal ensuite : l'affichage ne retarde jamais rien
                     await ws.send(json.dumps({"type": "result", "id": msg.get("id"), "ok": True}))
+                    log(f"{label or 'Bouton'} → {describe(keys)}")
                 except OSError as e:
                     log(f"Échec de l'envoi de {describe(keys)} : {e}")
                     await ws.send(json.dumps({"type": "result", "id": msg.get("id"), "ok": False, "reason": "envoi refusé par Windows"}))
@@ -230,7 +267,8 @@ async def main():
     if DRYRUN:
         print("  [mode test : les touches sont affichées, pas envoyées]")
     print("=" * 52, flush=True)
-    async with websockets.serve(handler, "0.0.0.0", PORT, ping_interval=20, ping_timeout=20, max_size=4096):
+    # compression=None : messages minuscules, la compression ne ferait qu'ajouter du travail
+    async with websockets.serve(handler, "0.0.0.0", PORT, ping_interval=20, ping_timeout=20, max_size=4096, compression=None):
         log(f"En attente de la tablette sur le port {PORT}…")
         await asyncio.Future()
 
@@ -257,6 +295,7 @@ if __name__ == "__main__":
         print("Démarrage automatique désactivé." if set_autostart(False) else "Rien à faire.")
         sys.exit(0)
     first_run_questions()
+    tune_windows()
     try:
         asyncio.run(main())
     except KeyboardInterrupt:

@@ -384,7 +384,8 @@ public class MainActivity extends Activity {
     private synchronized void wsConnect(int id, String url) {
         if (url == null || !(url.startsWith("ws://") || url.startsWith("wss://"))) { wsEvent(id, "close", "adresse invalide"); return; }
         if (sock != null) { sock.cancel(); sock = null; }
-        if (http == null) http = new OkHttpClient.Builder().connectTimeout(4, TimeUnit.SECONDS).pingInterval(20, TimeUnit.SECONDS).build();
+        if (http == null) http = new OkHttpClient.Builder().connectTimeout(4, TimeUnit.SECONDS).pingInterval(20, TimeUnit.SECONDS)
+                .socketFactory(new NoDelaySocketFactory()).build();
         sockId = id;
         Request req;
         try { req = new Request.Builder().url(url).build(); } catch (Exception e) { wsEvent(id, "close", "adresse invalide"); return; }
