@@ -92,6 +92,9 @@ button{cursor:pointer}
 .tile.media.playing .mart{box-shadow:0 0 28px -6px var(--c)}
 .hint-s{color:var(--muted);font-size:13px;margin:8px 0 0}
 .grid{will-change:transform}
+/* La grille gère elle-même les gestes : sans ça, Android « vole » le glissé pour faire défiler
+   et annule le swipe (pointercancel). */
+.grid,.grid *{touch-action:none}
 .editing .tile{touch-action:none}
 .tile.slot{border:2px dashed var(--line);background:none;box-shadow:none;--c:var(--muted);opacity:.55}
 .tile.slot svg{width:clamp(22px,22%,40px);filter:none}
@@ -459,7 +462,7 @@ const grid = $("#grid");
 let gest = null, swallowClick = false;
 document.addEventListener("pointerdown", e => {
   if (editing || gest || $("#sheetRoot").innerHTML) return;
-  if (!e.target.closest("#grid, .bar") || !$("#setup").hidden) return;
+  if (!e.target.closest("#grid") || !$("#setup").hidden) return;
   if (e.pointerType === "mouse" && e.button !== 0) return;
   const el = e.target.closest("#grid .tile[data-tile]");
   const mk = e.target.closest("[data-mkey]");
