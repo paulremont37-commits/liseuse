@@ -34,4 +34,7 @@ final class FlavorHooks {
         long last = Losc.load(a).optLong("updatedAt", 0);
         if (System.currentTimeMillis() - last > 5 * Losc.MIN) TickWorker.refreshNow(a);
     }
+
+    /** Wi-Fi faible latence : utile seulement au Stream Deck. */
+    static void lowLatency(boolean on) {}
 }

@@ -33,9 +33,19 @@ final class FlavorHooks {
         }
     }
 
+    private static boolean wanted = true;
+
     static void onResume(Activity a) {
+        lowLatency(wanted);
+    }
+
+    /** Écran en veille (atténué) : on rend le Wi-Fi à l'économie d'énergie ; au réveil on le reprend. */
+    static void lowLatency(boolean on) {
+        wanted = on;
         try {
-            if (wifiLock != null && !wifiLock.isHeld()) wifiLock.acquire();
+            if (wifiLock == null) return;
+            if (on && !wifiLock.isHeld()) wifiLock.acquire();
+            if (!on && wifiLock.isHeld()) wifiLock.release();
         } catch (Exception ignored) {
         }
     }

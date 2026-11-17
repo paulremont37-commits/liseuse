@@ -33,7 +33,7 @@ button{cursor:pointer}
 .status span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dot{width:12px;height:12px;border-radius:50%;background:var(--muted);flex:none;box-shadow:0 0 0 4px color-mix(in srgb,var(--muted) 20%,transparent)}
 .status.on .dot{background:var(--ok);box-shadow:0 0 0 4px color-mix(in srgb,var(--ok) 22%,transparent)}
-.status.wait .dot{background:var(--sound);animation:blink 1s infinite}
+.status.wait .dot{background:var(--sound);animation:blink 1s 8}
 .status.err .dot{background:var(--bad)}
 @keyframes blink{50%{opacity:.35}}
 .tabs{flex:1;display:flex;justify-content:center;gap:6px;min-width:0;overflow-x:auto;scrollbar-width:none}
@@ -119,6 +119,18 @@ button{cursor:pointer}
 .mrow.muted input[type=range]{opacity:.35}.mrow.muted .mval{color:var(--muted)}
 .mrow.big .mname b{font-size:17px}
 @media (max-width:640px){.mrow{grid-template-columns:40px minmax(0,1fr) 46px;grid-template-areas:"b n m" "r r v"}.mbadge{grid-area:b;width:40px;height:40px}.mname{grid-area:n}.mmute{grid-area:m;width:46px}.mrow input[type=range]{grid-area:r}.mval{grid-area:v}}
+.bat{display:flex;align-items:center;gap:7px;font-weight:700;font-size:14px;color:var(--fg);font-variant-numeric:tabular-nums;--bc:var(--ok)}
+.bat .bshape{position:relative;width:30px;height:15px;border:2px solid var(--bc);border-radius:4px;padding:1.5px;box-shadow:0 0 8px -2px var(--bc)}
+.bat .bshape::after{content:"";position:absolute;right:-5px;top:3px;width:3px;height:5px;border-radius:0 2px 2px 0;background:var(--bc)}
+.bat .bshape i{display:block;height:100%;border-radius:2px;background:var(--bc);box-shadow:0 0 6px var(--bc)}
+.bat.mid{--bc:var(--sound)}.bat.low{--bc:var(--bad)}.bat.chg{--bc:var(--music)}
+.bat.chg b::before{content:"⚡";margin-right:2px;color:var(--music)}
+@media (max-width:640px){.bat b{display:none}}
+#sleep{position:fixed;inset:0;z-index:100;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#3a3d4f;touch-action:none}
+#sleep .sclock{font-family:var(--f-display);font-weight:800;font-size:clamp(64px,14vw,180px);letter-spacing:-.02em;color:color-mix(in srgb,var(--music) 45%,#000)}
+#sleep .sbat{font-weight:700;font-size:22px;color:#4a4d60}
+#sleep p{margin:16px 0 0;font-size:14px}
+body.asleep *,body.asleep *::before,body.asleep *::after{animation:none!important;transition:none!important}
 .hint-s{color:var(--muted);font-size:13px;margin:8px 0 0}
 .grid{will-change:transform}
 /* La grille gère elle-même les gestes : sans ça, Android « vole » le glissé pour faire défiler
@@ -237,6 +249,7 @@ button{cursor:pointer}
   <header class="bar">
     <div class="status" id="status"><i class="dot"></i><span id="statusTxt">Hors ligne</span></div>
     <nav class="tabs" id="tabs" aria-label="Pages"></nav>
+    <div class="bat" id="bat" hidden><span class="bshape"><i></i></span><b id="batTxt"></b></div>
     <div class="clock" id="clock"></div>
     <button class="ib" id="mixBtn" aria-label="Mixer : volume de chaque appli"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg></button>
     <button class="ib" id="editBtn" aria-pressed="false" aria-label="Modifier les boutons"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/></svg></button>
@@ -320,7 +333,7 @@ function defaults() {
 }
 
 /* ---------------- état ---------------- */
-let st = { pc: null, code: "", cols: 5, pages: defaults(), page: 0, states: {}, seenHelp: false };
+let st = { pc: null, code: "", cols: 5, pages: defaults(), page: 0, states: {}, seenHelp: false, sleep: 60 };
 try { const s = JSON.parse(localStorage.getItem("deck.v1") || "null"); if (s && Array.isArray(s.pages)) st = Object.assign(st, s); } catch (e) {}
 // Une page = une liste de cases ; null = case vide (les boutons gardent la place où on les a mis).
 const trimPages = () => st.pages.forEach(p => { p.tiles = p.tiles || []; while (p.tiles.length && !p.tiles[p.tiles.length - 1]) p.tiles.pop(); });
@@ -390,7 +403,8 @@ function ping() {
   try { C.ws.send(JSON.stringify({ type: "ping", id })); } catch (e) {}
 }
 // Un petit message régulier garde la connexion (et le Wi-Fi) éveillés entre deux appuis
-setInterval(ping, 5000);
+let pingT = setInterval(ping, 5000);
+function pingEvery(ms) { clearInterval(pingT); pingT = setInterval(ping, ms); }
 document.addEventListener("visibilitychange", () => { if (!document.hidden && C.state !== "on" && st.pc) connect(); });
 
 /* ---------------- rendu ---------------- */
@@ -493,7 +507,7 @@ function paintMedia() {
     if (on && d.dur) bar.firstChild.style.width = (100 * mediaPos() / d.dur).toFixed(2) + "%";
   });
 }
-setInterval(() => { if (M.d && M.d.playing) paintMedia(); }, 500);
+setInterval(() => { if (M.d && M.d.playing && !asleep) paintMedia(); }, 500);
 
 /* ---------------- mixer : volume de chaque appli du PC ---------------- */
 const MX = { data: null, timer: 0, wait: 0, drag: null, sent: 0, pend: null };
@@ -842,6 +856,7 @@ function openSettings(confirmReset) {
     <div class="toggle-row" style="border:0"><div>PC<small>${st.pc ? esc(st.pc) + " · " + (C.state === "on" ? "connecté" : "non connecté") : "aucun"}</small></div><button class="btn" data-act="setup">Changer</button></div>
     <div class="toggle-row"><div>Colonnes</div><div class="chips">${[3, 4, 5, 6, 7].map(n => `<button class="chip" data-cols="${n}" aria-pressed="${st.cols === n}">${n}</button>`).join("")}</div></div>
     <div class="toggle-row"><div>Page « ${esc(st.pages[st.page].name)} »<small>Renommer ou supprimer la page affichée.</small></div><div class="chips"><button class="chip" data-act="rename-page">Renommer</button>${st.pages.length > 1 ? `<button class="chip" data-act="del-page">Supprimer</button>` : ""}</div></div>
+    <div class="toggle-row"><div>Veille de l'écran<small>Sans toucher la tablette, l'écran passe au minimum et le Wi-Fi s'économise. Un toucher le rallume (sans appuyer sur un bouton).</small></div><div class="chips">${[[30, "30 s"], [60, "1 min"], [120, "2 min"], [300, "5 min"], [0, "Jamais"]].map(([v, l]) => `<button class="chip" data-sleep="${v}" aria-pressed="${(st.sleep ?? 60) === v}">${l}</button>`).join("")}</div></div>
     <div class="toggle-row"><div>États des boutons<small>Si un bouton affiche « Coupé » alors que ce n'est plus le cas.</small></div><button class="btn" data-act="reset-states">Tout éteindre</button></div>
     ${AND ? `<div class="toggle-row"><div>Version<small>Appli ${esc(call("appVersion") || "?")} · interface ${esc(call("webVersion") || "?")}</small></div></div>` : ""}
     <div class="toggle-row"><div>Guide<small>Installation, Discord, Voicemod, Medal, personnalisation, dépannage.</small></div><button class="btn primary" data-act="guide">Ouvrir le guide</button></div>
@@ -880,6 +895,7 @@ function openGuide() {
       <li>Touche le <b>crayon</b> en haut : les boutons bougent légèrement, touche-en un pour le modifier (nom, couleur, icône, touche envoyée).</li>
       <li>Pour changer de page, <b>glisse vers la gauche ou la droite</b> n'importe où sur la grille (ou touche le nom de la page en haut).</li>
       <li>Case <b>Musique en cours</b> : en modification, touche une case vide puis choisis <b>Musique en cours</b> (1, 2 ou 3 cases de large). Elle affiche ce qui joue sur le PC (Deezer, Spotify…) avec précédent / lecture / suivant.</li>
+      <li><b>Batterie</b> : affichée en haut à droite. Sans toucher la tablette (1 min par défaut, réglable dans Réglages → Veille de l'écran), l'écran passe au minimum avec l'heure ; un toucher le rallume sans appuyer sur un bouton.</li>
       <li><b>Mixer</b> : bouton à curseurs en haut à droite (ou une case Mixer : touche une case vide (+) en modification et choisis <b>Mixer</b>). Elle ouvre le volume général et le volume de chaque appli du PC (Discord, Deezer, jeu…), avec un bouton muet chacune.</li>
       <li>Pour <b>déplacer</b> un bouton, fais-le glisser : sur une case vide il s'y pose, sur un autre bouton ils échangent leur place, sur un onglet il part dans cette page.</li>
       <li>Touche une <b>case vide (+)</b> pour créer un bouton à cet endroit. <b>+ Page</b> crée une page.</li>
@@ -923,6 +939,7 @@ document.addEventListener("click", async e => {
     const md = t.closest("[data-media]"); if (md) { readDraft(); draft.keys = [md.dataset.media]; drawEditor(); return; }
     const mo = t.closest("[data-mod]"); if (mo) { readDraft(); const m = mo.dataset.mod; const mods = new Set(draft.keys.filter(x => KEYNAME[x])); mods.has(m) ? mods.delete(m) : mods.add(m); const main = draft.keys.find(x => !KEYNAME[x]); draft.keys = ["ctrl", "alt", "shift"].filter(x => mods.has(x)).concat(main); drawEditor(); return; }
   }
+  const sl = t.closest("[data-sleep]"); if (sl) { st.sleep = +sl.dataset.sleep; save(); armSleep(); openSettings(); return; }
   const co = t.closest("[data-cols]"); if (co) { st.cols = +co.dataset.cols; save(); renderGrid(); openSettings(); return; }
   const a = t.closest("[data-act]"); if (!a) return;
   const act = a.dataset.act;
@@ -981,11 +998,63 @@ function applyUpdateWhenIdle() {
 window.liseuseUpdateReady = () => { updatePending = true; toast("Mise à jour téléchargée, elle s'installe toute seule.", 3000); setTimeout(applyUpdateWhenIdle, 5000); };
 let rz = 0; addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(renderGrid, 100); });
 
-function tick() { $("#clock").textContent = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }); }
+function tick() { const t = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }); $("#clock").textContent = t; const sc = document.getElementById("sleepClock"); if (sc) sc.textContent = t; }
 tick(); setInterval(tick, 15000);
+
+/* ---------------- batterie de la tablette ---------------- */
+async function readBattery() {
+  let lvl = call("battery"), chg = call("charging");
+  if ((lvl == null || lvl < 0) && navigator.getBattery) { try { const b = await navigator.getBattery(); lvl = Math.round(b.level * 100); chg = b.charging; } catch (e) {} }
+  if (lvl == null || lvl < 0) return null;
+  return { lvl, chg: !!chg };
+}
+async function paintBattery() {
+  const b = await readBattery(); const el = $("#bat"); if (!b) { el.hidden = true; return; }
+  el.hidden = false;
+  el.className = "bat" + (b.chg ? " chg" : b.lvl <= 15 ? " low" : b.lvl <= 35 ? " mid" : "");
+  el.querySelector("i").style.width = Math.max(4, b.lvl) + "%";
+  $("#batTxt").textContent = b.lvl + " %";
+  el.setAttribute("aria-label", `Batterie ${b.lvl} %${b.chg ? ", en charge" : ""}`);
+  const sb = $("#sleepBat"); if (sb) sb.textContent = `${b.chg ? "⚡ " : ""}${b.lvl} %`;
+}
+paintBattery(); setInterval(paintBattery, 60000);
+
+/* ---------------- veille : écran au minimum quand on ne touche pas ---------------- */
+// L'écran est de loin ce qui consomme le plus. En veille : luminosité minimale, écran noir avec l'heure,
+// plus d'animations, Wi-Fi rendu à l'économie d'énergie et connexion au PC vérifiée 6× moins souvent.
+let asleep = false, sleepT = 0;
+function armSleep() {
+  clearTimeout(sleepT);
+  const s = st.sleep ?? 60;
+  if (s > 0 && !asleep) sleepT = setTimeout(goSleep, s * 1000);
+}
+function goSleep() {
+  if (editing || $("#sheetRoot").innerHTML || !$("#setup").hidden || gest || SW.busy) { armSleep(); return; }
+  asleep = true;
+  document.body.classList.add("asleep");
+  let ov = $("#sleep");
+  if (!ov) { ov = document.createElement("div"); ov.id = "sleep"; ov.innerHTML = `<div class="sclock" id="sleepClock"></div><div class="sbat" id="sleepBat"></div><p>Touche l'écran pour rallumer</p>`; document.body.appendChild(ov); }
+  ov.hidden = false; $("#sleepClock").textContent = $("#clock").textContent; paintBattery();
+  call("setBrightness", 0.01); call("lowLatency", false); pingEvery(30000);
+}
+function wake() {
+  if (!asleep) { armSleep(); return; }
+  asleep = false;
+  document.body.classList.remove("asleep");
+  const ov = $("#sleep"); if (ov) ov.hidden = true;
+  call("setBrightness", -1); call("lowLatency", true); pingEvery(5000); ping(); paintMedia(); paintBattery();
+  armSleep();
+}
+// Le premier toucher pendant la veille ne fait que rallumer : il n'appuie sur rien
+addEventListener("pointerdown", e => {            // sur window : passe avant tous les autres gestes
+  if (asleep) { e.preventDefault(); e.stopPropagation(); swallowClick = true; setTimeout(() => { swallowClick = false; }, 400); wake(); return; }
+  armSleep();
+}, true);
+window.liseuseWake = () => { if (C.state !== "on" && st.pc) connect(); paintBattery(); wake(); };
 
 /* ---------------- démarrage ---------------- */
 call("keepScreenOn", true);
+armSleep();
 if (st.pc) { showDeck(); connect(); } else { showSetup(); setStatus("off", "Pas de PC"); }
 call("ready");
 window.__deck = { st, C, sendKeys };

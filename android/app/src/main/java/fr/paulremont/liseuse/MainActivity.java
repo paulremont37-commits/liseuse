@@ -340,6 +340,25 @@ public class MainActivity extends Activity {
         super.onPause();
     }
 
+    /** Écran éteint ou appli cachée : plus aucun minuteur JavaScript ni connexion réseau, rien ne tourne. */
+    @Override
+    protected void onStop() {
+        if (web != null) web.pauseTimers();
+        synchronized (this) {
+            if (sock != null) { sock.close(1000, "veille"); sock = null; }
+        }
+        super.onStop();
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        if (web != null) {
+            web.resumeTimers();
+            web.evaluateJavascript("window.liseuseWake && window.liseuseWake()", null);
+        }
+    }
+
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
@@ -430,6 +449,27 @@ public class MainActivity extends Activity {
             runOnUiThread(() -> {
                 if (on) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
                 else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            });
+        }
+
+        @JavascriptInterface
+        public boolean charging() {
+            Intent i = registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+            if (i == null) return false;
+            int st = i.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
+            return st == BatteryManager.BATTERY_STATUS_CHARGING || st == BatteryManager.BATTERY_STATUS_FULL;
+        }
+
+        @JavascriptInterface
+        public void lowLatency(boolean on) { FlavorHooks.lowLatency(on); }
+
+        /** Luminosité de l'écran pour cette appli : 0 à 1, ou -1 pour revenir au réglage d'Android. */
+        @JavascriptInterface
+        public void setBrightness(float v) {
+            runOnUiThread(() -> {
+                WindowManager.LayoutParams lp = getWindow().getAttributes();
+                lp.screenBrightness = v < 0 ? WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE : Math.max(0.004f, Math.min(1f, v));
+                getWindow().setAttributes(lp);
             });
         }
 

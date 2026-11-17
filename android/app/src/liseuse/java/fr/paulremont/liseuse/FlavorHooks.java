@@ -14,4 +14,7 @@ final class FlavorHooks {
     static void attach(Activity a, WebView web) {}
 
     static void onResume(Activity a) {}
+
+    /** Wi-Fi faible latence : utile seulement au Stream Deck. */
+    static void lowLatency(boolean on) {}
 }
