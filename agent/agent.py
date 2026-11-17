@@ -320,6 +320,8 @@ async def handler(ws):
                 continue
             if msg.get("type") == "ping":
                 await ws.send(json.dumps({"type": "pong", "id": msg.get("id")}))
+            elif msg.get("type") in ("mixer_get", "mixer_set"):
+                await mixer_message(ws, msg)
             elif msg.get("type") == "press":
                 keys = validate(msg.get("keys"))
                 label = str(msg.get("label", ""))[:40]
@@ -341,6 +343,27 @@ async def handler(ws):
         with st.lock:
             st.clients.pop(ws, None)
     st.event("off", f"Tablette déconnectée ({ip})")
+
+
+async def mixer_message(ws, msg):
+    """Mixer : la tablette lit ou règle le volume général et celui de chaque appli (rien d'autre)."""
+    import mixer as mixer_mod
+    why = mixer_mod.available()
+    if why:
+        await ws.send(json.dumps({"type": "mixer", "ok": False, "reason": why}))
+        return
+    try:
+        if msg["type"] == "mixer_set":
+            target = str(msg.get("id", ""))[:80]
+            vol = msg.get("vol")
+            vol = max(0, min(100, float(vol))) if isinstance(vol, (int, float)) and not isinstance(vol, bool) else None
+            mute = msg.get("mute") if isinstance(msg.get("mute"), bool) else None
+            await mixer_mod.run(mixer_mod.apply, target, vol, mute)
+            if mute is None and not msg.get("reply"):
+                return  # pendant qu'on glisse un curseur : pas besoin de renvoyer tout l'état
+        await ws.send(json.dumps(await mixer_mod.run(mixer_mod.state)))
+    except Exception as e:
+        await ws.send(json.dumps({"type": "mixer", "ok": False, "reason": f"{type(e).__name__}: {e}"}))
 
 
 async def broadcast(st, msg):
@@ -446,6 +469,16 @@ if __name__ == "__main__":
             res["media_read"] = asyncio.run(_read()) if media_mod.Manager else None
         except Exception as e:
             res["media_import"] = f"{type(e).__name__}: {e}"
+        try:
+            import mixer as mixer_mod
+            res["mixer_import"] = mixer_mod.available() or "ok"
+            if res["mixer_import"] == "ok":
+                try:
+                    res["mixer_state"] = mixer_mod.pool().submit(mixer_mod.state).result(10)
+                except Exception as e:
+                    res["mixer_state"] = f"{type(e).__name__}: {e}"
+        except Exception as e:
+            res["mixer_import"] = f"{type(e).__name__}: {e}"
         try:
             import gui  # noqa: F401
             res["gui_import"] = "ok"
