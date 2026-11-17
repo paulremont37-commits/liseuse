@@ -372,15 +372,13 @@ function tileHTML(t, wide) {
   return `<button class="tile${on ? " on" : ""}" data-tile="${t.id}" style="--c:${COLORS[t.color] || COLORS.plain};--oc:${COLORS[t.onColor] || COLORS.clip}">
     <span class="flag">${esc(t.onLabel || "Actif")}</span>${ICONS[t.icon] || ICONS.keyboard}<span class="lbl">${esc(t.label)}</span><span class="keys">${esc(describe(t.keys))}</span></button>`;
 }
-function renderGrid() {
-  const page = st.pages[st.page] || st.pages[0]; if (!page) return;
-  trimPages();
-  const g = $("#grid"); const tiles = page.tiles;
+function pageLayout(n, edit) {
+  const page = st.pages[n] || st.pages[0];
+  const tiles = page.tiles;
   const cols = Math.max(2, Math.min(innerWidth < 640 ? 3 : 8, st.cols));
   // En modification, toujours au moins une case libre après le dernier bouton
-  const rows = Math.max(Math.ceil((tiles.length + (editing ? 1 : 0)) / cols), innerWidth < 640 ? 4 : 3);
-  g.style.gridTemplateColumns = `repeat(${cols},minmax(0,1fr))`; g.style.gridTemplateRows = `repeat(${rows},minmax(0,1fr))`;
-  g.classList.toggle("editing", editing);
+  const rows = Math.max(Math.ceil((tiles.length + (edit ? 1 : 0)) / cols), innerWidth < 640 ? 4 : 3);
+  const editing = edit;
   const count = editing ? rows * cols : tiles.length;
   let html = ""; const covered = new Set();
   for (let i = 0; i < count; i++) {
@@ -391,7 +389,15 @@ function renderGrid() {
     if (wide) covered.add(i + 1);
     html += t ? tileHTML(t, wide) : editing ? `<button class="tile slot" data-slot="${i}" aria-label="Ajouter un bouton ici">${PLUS}</button>` : `<div class="tile ghost" aria-hidden="true"></div>`;
   }
-  g.innerHTML = html;
+  return { html, cols, rows };
+}
+function renderGrid() {
+  if (!st.pages[st.page]) st.page = 0;
+  trimPages();
+  const g = $("#grid"); const L = pageLayout(st.page, editing);
+  g.style.gridTemplateColumns = `repeat(${L.cols},minmax(0,1fr))`; g.style.gridTemplateRows = `repeat(${L.rows},minmax(0,1fr))`;
+  g.classList.toggle("editing", editing);
+  g.innerHTML = L.html;
   paintMedia();
 }
 function render() { renderTabs(); renderGrid(); $("#editBtn").setAttribute("aria-pressed", String(editing)); }
@@ -461,7 +467,7 @@ const grid = $("#grid");
 // Hors modification : un toucher sans glisser = appui (envoyé au relâchement), un glissé horizontal = page suivante/précédente.
 let gest = null, swallowClick = false;
 document.addEventListener("pointerdown", e => {
-  if (editing || gest || $("#sheetRoot").innerHTML) return;
+  if (editing || gest || SW.busy || $("#sheetRoot").innerHTML) return;
   if (!e.target.closest("#grid") || !$("#setup").hidden) return;
   if (e.pointerType === "mouse" && e.button !== 0) return;
   const el = e.target.closest("#grid .tile[data-tile]");
@@ -475,13 +481,14 @@ addEventListener("pointermove", e => {
   g.dx = dx; const now = performance.now(); g.pts.push([now, e.clientX]); while (g.pts.length > 2 && now - g.pts[0][0] > 120) g.pts.shift();
   if (!g.swipe && !g.dead) {
     if (Math.abs(dx) > 22 && Math.abs(dx) > Math.abs(dy) * 1.3 && st.pages.length > 1) {
-      g.swipe = true; unpress(g); grid.style.transition = "none";
+      g.swipe = true; unpress(g); grid.style.transition = "none"; SW.measure();
     } else if (Math.hypot(dx, dy) > 28) { g.dead = true; unpress(g); }
   }
   if (g.swipe) {
-    const edge = (dx > 0 && st.page === 0) || (dx < 0 && st.page === st.pages.length - 1);
-    grid.style.transform = `translateX(${edge ? dx * 0.25 : dx}px)`;
-    grid.style.opacity = String(1 - Math.min(0.5, Math.abs(dx) / innerWidth));
+    const n = st.page + (dx < 0 ? 1 : -1);
+    const has = n >= 0 && n < st.pages.length;
+    if (has) ensureGhost(n); else dropGhost();
+    setX(has ? dx : dx * 0.25);
   }
 }, { passive: true });
 function unpress(g) { if (g.el) g.el.classList.remove("down"); if (g.mk) g.mk.classList.remove("down"); }
@@ -508,21 +515,56 @@ function endSwipe(g, dx) {
   let dir = 0;
   if (Math.abs(v) > 0.25 && Math.sign(v) === Math.sign(dx)) dir = dx < 0 ? 1 : -1;      // geste vif
   else if (Math.abs(dx) > Math.max(70, innerWidth * 0.12)) dir = dx < 0 ? 1 : -1;      // glissé assez long
-  goPage(st.page + dir, dir);
+  SW.v = v;
+  slideTo(st.page + dir);
 }
 document.addEventListener("click", e => { if (swallowClick) { swallowClick = false; e.stopPropagation(); e.preventDefault(); } }, true);
-function goPage(n, dir) {
-  const ok = n >= 0 && n < st.pages.length && n !== st.page;
-  grid.style.transition = "transform .16s ease-in, opacity .16s ease-in";
-  if (!ok) { grid.style.transform = ""; grid.style.opacity = ""; return; }
-  grid.style.transform = `translateX(${dir > 0 ? -40 : 40}%)`; grid.style.opacity = "0";
-  setTimeout(() => {
-    st.page = n; save(); render();
-    grid.style.transition = "none"; grid.style.transform = `translateX(${dir > 0 ? 30 : -30}%)`; grid.style.opacity = "0";
-    void grid.offsetWidth;
-    grid.style.transition = "transform .2s ease-out, opacity .2s ease-out"; grid.style.transform = ""; grid.style.opacity = "";
-  }, 150);
+/* Carrousel : la page voisine est dessinée à côté et suit le doigt ; seules des translations
+   (gérées par la carte graphique) bougent pendant le geste, rien n'est redessiné. */
+const SW = { ghost: null, n: -1, W: 0, dx: 0, v: 0, raf: 0, busy: false, rect: null,
+  measure() { this.rect = grid.getBoundingClientRect(); this.W = this.rect.width + 28; } };
+function ensureGhost(n) {
+  if (SW.ghost && SW.n === n) return SW.ghost;
+  dropGhost();
+  if (!SW.rect) SW.measure();
+  const r = SW.rect, L = pageLayout(n, false);
+  const gh = document.createElement("div");
+  gh.className = "grid ghostgrid"; gh.setAttribute("aria-hidden", "true");
+  gh.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;grid-template-columns:repeat(${L.cols},minmax(0,1fr));grid-template-rows:repeat(${L.rows},minmax(0,1fr));pointer-events:none;z-index:1`;
+  gh.innerHTML = L.html;
+  document.body.appendChild(gh);
+  SW.ghost = gh; SW.n = n; paintMedia(); applyX();
+  return gh;
 }
+function dropGhost() { if (SW.ghost) { SW.ghost.remove(); SW.ghost = null; SW.n = -1; } }
+function applyX() {
+  SW.raf = 0;
+  grid.style.transform = `translate3d(${SW.dx}px,0,0)`;
+  if (SW.ghost) SW.ghost.style.transform = `translate3d(${SW.dx + (SW.n > st.page ? SW.W : -SW.W)}px,0,0)`;
+}
+function setX(dx) { SW.dx = dx; if (!SW.raf) SW.raf = requestAnimationFrame(applyX); }
+function slideTo(n) {
+  if (SW.raf) { cancelAnimationFrame(SW.raf); applyX(); }
+  const ok = n >= 0 && n < st.pages.length && n !== st.page;
+  if (!SW.rect) SW.measure();
+  const gh = ok ? ensureGhost(n) : null;
+  const dir = ok ? Math.sign(n - st.page) : 0;
+  const target = dir ? -dir * SW.W : 0;
+  const dist = Math.abs(target - SW.dx);
+  const ms = Math.round(Math.max(150, Math.min(320, dist / Math.max(1.1, Math.abs(SW.v) || 0))));
+  const tr = `transform ${ms}ms cubic-bezier(.22,.8,.24,1)`;
+  SW.busy = true;
+  grid.style.transition = tr; grid.style.transform = `translate3d(${target}px,0,0)`;
+  if (gh) { gh.style.transition = tr; gh.style.transform = "translate3d(0,0,0)"; }
+  else if (SW.ghost) { SW.ghost.style.transition = tr; SW.ghost.style.transform = `translate3d(${SW.n > st.page ? SW.W : -SW.W}px,0,0)`; }
+  setTimeout(() => {
+    if (ok) { st.page = n; save(); renderTabs(); renderGrid(); }
+    grid.style.transition = "none"; grid.style.transform = "";
+    dropGhost(); SW.dx = 0; SW.v = 0; SW.rect = null; SW.busy = false;
+  }, ms + 30);
+}
+function goPage(n) { slideTo(n); }
+addEventListener("resize", () => { SW.rect = null; });
 async function mediaPress(key, el) {
   try { navigator.vibrate && navigator.vibrate(10); } catch (x) {}
   const r = await sendKeys([key], "Musique");
@@ -732,7 +774,8 @@ function openGuide() {
 /* ---------------- événements ---------------- */
 document.addEventListener("click", async e => {
   const t = e.target;
-  const pg = t.closest("[data-page]"); if (pg) { st.page = +pg.dataset.page; save(); render(); return; }
+  const pg = t.closest("[data-page]");
+  if (pg) { const n = +pg.dataset.page; if (!editing && !SW.busy && n !== st.page && Math.abs(n - st.page) === 1) { SW.dx = 0; SW.measure(); slideTo(n); } else { st.page = n; save(); render(); } return; }
   const nat = t.closest("[data-native]"); if (nat) { call(nat.dataset.native); return; }
   if (t.closest("#editBtn")) { editing = !editing; render(); if (editing) toast("Touche un bouton pour le modifier, fais-le glisser pour le déplacer.", 3200); return; }
   if (t.closest("#setBtn")) { openSettings(); return; }

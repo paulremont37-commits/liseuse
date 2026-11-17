@@ -68,6 +68,16 @@ jobs:
           pip install -r agent/requirements.txt
           pyinstaller --onefile --noconsole --name StreamDeckPC --icon agent/icon.ico --paths agent --hidden-import gui --hidden-import media --collect-submodules winrt --add-data "agent/ui.html;." --add-data "agent/icon.ico;." --add-data "agent/bricolage-800.woff2;." agent/agent.py
 
+      - name: Vérifier l'exe (musique en cours et fenêtre inclus)
+        shell: pwsh
+        run: |
+          Start-Process -FilePath dist\StreamDeckPC.exe -ArgumentList "--selftest" -Wait
+          Get-Content selftest.txt
+          $r = Get-Content selftest.txt | ConvertFrom-Json
+          if ($r.media_import -ne "ok") { Write-Output "::error::Musique en cours absente de l'exe : $($r.media_import)"; exit 1 }
+          if ($r.gui_import -ne "ok") { Write-Output "::error::Fenêtre absente de l'exe : $($r.gui_import)"; exit 1 }
+          if ($r.media_read -is [string]) { Write-Output "::warning::Lecture de la musique sur la machine de compilation : $($r.media_read)" }
+
       - uses: actions/upload-artifact@v4
         with:
           name: pc

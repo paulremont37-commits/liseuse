@@ -9,16 +9,23 @@ import asyncio
 import base64
 import datetime
 import hashlib
+import sys
 import time
 
+IMPORT_ERROR = ""
 try:
+    if sys.platform == "win32":
+        # La lecture des contrôles multimédias passe par COM : on initialise le fil (sans effet s'il l'est déjà)
+        import ctypes
+        ctypes.windll.ole32.CoInitializeEx(None, 0)  # COINIT_MULTITHREADED
     from winrt.windows.media.control import (
         GlobalSystemMediaTransportControlsSessionManager as Manager,
         GlobalSystemMediaTransportControlsSessionPlaybackStatus as Status,
     )
     from winrt.windows.storage.streams import Buffer, InputStreamOptions
-except Exception:  # autre système que Windows, ou paquet absent : pas de widget, le reste marche
+except Exception as e:  # autre système que Windows, ou paquet absent : pas de widget, le reste marche
     Manager = None
+    IMPORT_ERROR = f"{type(e).__name__}: {e}"
 
 APPS = {"deezer": "Deezer", "spotify": "Spotify", "chrome": "Chrome", "msedge": "Edge", "firefox": "Firefox",
         "zunemusic": "Lecteur multimédia", "music.ui": "Groove", "vlc": "VLC", "applemusic": "Apple Music",
@@ -113,18 +120,30 @@ async def loop(st, broadcast):
     media = Media()
     st.media = media
     if Manager is None:
+        st.media_info = "Indisponible : " + (IMPORT_ERROR or "Windows uniquement")
+        st.event("warn", "Musique en cours indisponible (" + (IMPORT_ERROR or "Windows uniquement") + ")")
         return
-    tick = 0
+    st.media_info = "Recherche de la musique…"
+    tick, last_err = 0, ""
     while True:
         try:
             m = await media.read()
             tick += 1
+            if m is not None:
+                st.media_info = (f"{m['app']} · {m['title']} — {m['artist']}" + ("" if m["playing"] else " (en pause)")) if m.get("active") \
+                    else "Rien en lecture : lance un morceau sur Deezer, Spotify ou le navigateur"
+                last_err = ""
             if m is not None and (media.changed(m) or tick % 10 == 0):
                 full = dict(m, art=media.art if (media.last or {}).get("artId") != m.get("artId") else None)
                 media.last = m
                 media.last_t = time.monotonic()
                 await broadcast(full)
-        except Exception:
+        except Exception as e:
+            err = f"{type(e).__name__}: {e}"
+            st.media_info = "Erreur : " + err
+            if err != last_err:
+                last_err = err
+                st.event("warn", "Musique en cours : " + err)
             media.mgr = None  # on réessaiera (service multimédia redémarré…)
         await asyncio.sleep(1)
 

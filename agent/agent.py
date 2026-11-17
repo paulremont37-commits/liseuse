@@ -194,6 +194,7 @@ class State:
         self.presses = 0
         self.loop = None
         self.media = None           # musique en cours (media.py)
+        self.media_info = ""
 
     def event(self, kind, text, **extra):
         with self.lock:
@@ -214,7 +215,7 @@ class State:
             return {
                 "app": APP, "ip": self.ip, "port": self.port, "code": self.code, "error": self.error,
                 "listening": self.listening, "dryrun": DRYRUN, "host": socket.gethostname(),
-                "tablets": tablets, "presses": self.presses,
+                "tablets": tablets, "presses": self.presses, "music": self.media_info,
                 "events": [e for e in self.events if e["seq"] > since], "seq": self.seq,
                 "autostart": autostart_on(), "canAutostart": bool(getattr(sys, "frozen", False) and sys.platform == "win32"),
                 "askAutostart": not self.cfg.get("askedAutostart") and bool(getattr(sys, "frozen", False) and sys.platform == "win32"),
@@ -358,8 +359,9 @@ async def serve(st):
     try:  # widget « musique en cours » (Windows uniquement)
         import media as media_mod
         asyncio.get_running_loop().create_task(media_mod.loop(st, lambda m: broadcast(st, m)))
-    except Exception:
-        pass
+    except Exception as e:
+        st.media_info = f"Indisponible : {type(e).__name__}: {e}"
+        st.event("warn", "Musique en cours indisponible : " + st.media_info)
     # compression=None : messages minuscules, la compression ne ferait qu'ajouter du travail
     async with websockets.serve(handler, "0.0.0.0", st.port, ping_interval=20, ping_timeout=20, max_size=4096, compression=None):
         st.listening = True
@@ -428,6 +430,29 @@ def console_main():
 if __name__ == "__main__":
     if "--no-autostart" in sys.argv:
         set_autostart(False)
+        sys.exit(0)
+    if "--selftest" in sys.argv:
+        # Vérification automatique de l'exe (compilation GitHub) : modules présents et lecture de la musique
+        res = {}
+        try:
+            import media as media_mod
+            res["media_import"] = media_mod.IMPORT_ERROR or "ok"
+
+            async def _read():
+                try:
+                    return await media_mod.Media().read()
+                except Exception as e:
+                    return f"{type(e).__name__}: {e}"
+            res["media_read"] = asyncio.run(_read()) if media_mod.Manager else None
+        except Exception as e:
+            res["media_import"] = f"{type(e).__name__}: {e}"
+        try:
+            import gui  # noqa: F401
+            res["gui_import"] = "ok"
+        except Exception as e:
+            res["gui_import"] = f"{type(e).__name__}: {e}"
+        with open("selftest.txt", "w", encoding="utf-8") as f:
+            json.dump(res, f, default=str)
         sys.exit(0)
     tune_windows()
     if autostart_on():
