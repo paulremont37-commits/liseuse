@@ -90,6 +90,11 @@ button{cursor:pointer}
 .tile.media.idle .mt{color:var(--muted)}
 .tile.media.idle .mctl button{opacity:.45}
 .tile.media.playing .mart{box-shadow:0 0 28px -6px var(--c)}
+.tile.media.w3{padding:16px 26px;column-gap:26px}
+.tile.media.w3 .mart{width:clamp(72px,13vw,190px)}
+.tile.media.w3 .mt{-webkit-line-clamp:2;font-size:clamp(17px,2.3vw,30px)}
+.tile.media.w3 .ma{font-size:clamp(13px,1.5vw,18px)}
+.tile.media.w3 .mctl button{width:clamp(40px,4.4vw,58px);height:clamp(40px,4.4vw,58px)}
 .hint-s{color:var(--muted);font-size:13px;margin:8px 0 0}
 .grid{will-change:transform}
 /* La grille gère elle-même les gestes : sans ça, Android « vole » le glissé pour faire défiler
@@ -366,8 +371,8 @@ function renderTabs() {
   $("#tabs").innerHTML = st.pages.map((p, i) => `<button class="tab" data-page="${i}" aria-current="${i === st.page}">${esc(p.name)}</button>`).join("") +
     (editing ? `<button class="tab" data-act="add-page">+ Page</button>` : "");
 }
-function tileHTML(t, wide) {
-  if (t.kind === "media") return mediaHTML(t, wide);
+function tileHTML(t, span) {
+  if (t.kind === "media") return mediaHTML(t, span || 1);
   const on = t.toggle && st.states[t.id];
   return `<button class="tile${on ? " on" : ""}" data-tile="${t.id}" style="--c:${COLORS[t.color] || COLORS.plain};--oc:${COLORS[t.onColor] || COLORS.clip}">
     <span class="flag">${esc(t.onLabel || "Actif")}</span>${ICONS[t.icon] || ICONS.keyboard}<span class="lbl">${esc(t.label)}</span><span class="keys">${esc(describe(t.keys))}</span></button>`;
@@ -384,10 +389,11 @@ function pageLayout(n, edit) {
   for (let i = 0; i < count; i++) {
     if (covered.has(i)) continue;
     const t = tiles[i];
-    // Widget large : prend aussi la case de droite si elle est libre et sur la même ligne
-    const wide = !!(t && t.kind === "media" && t.w === 2 && i % cols < cols - 1 && !tiles[i + 1]);
-    if (wide) covered.add(i + 1);
-    html += t ? tileHTML(t, wide) : editing ? `<button class="tile slot" data-slot="${i}" aria-label="Ajouter un bouton ici">${PLUS}</button>` : `<div class="tile ghost" aria-hidden="true"></div>`;
+    // Widget large : prend aussi les cases de droite si elles sont libres et sur la même ligne
+    let span = 1;
+    if (t && t.kind === "media" && t.w > 1) while (span < t.w && i % cols + span < cols && !tiles[i + span]) span++;
+    for (let k = 1; k < span; k++) covered.add(i + k);
+    html += t ? tileHTML(t, span) : editing ? `<button class="tile slot" data-slot="${i}" aria-label="Ajouter un bouton ici">${PLUS}</button>` : `<div class="tile ghost" aria-hidden="true"></div>`;
   }
   return { html, cols, rows };
 }
@@ -423,8 +429,8 @@ const MI = {
   pause: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.5 5h4v14h-4zM13.5 5h4v14h-4z"/></svg>',
   media_next: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.6 5H18v14h-2.4zM4 5.6v12.8L14.4 12z"/></svg>'
 };
-function mediaHTML(t, wide) {
-  return `<div class="tile media${wide ? " wide" : ""}" data-tile="${t.id}" role="group" aria-label="Musique en cours" style="--c:${COLORS[t.color] || COLORS.music}${wide ? ";grid-column:span 2" : ""}">
+function mediaHTML(t, span) {
+  return `<div class="tile media${span > 1 ? " wide" : ""}${span > 2 ? " w3" : ""}" data-tile="${t.id}" role="group" aria-label="Musique en cours" style="--c:${COLORS[t.color] || COLORS.music}${span > 1 ? ";grid-column:span " + span : ""}">
     <div class="mbg"></div><div class="mart">${NOTE}</div>
     <div class="minfo"><small class="mapp"></small><b class="mt"></b><span class="ma"></span><div class="mbar"><i></i></div></div>
     <div class="mctl"><button data-mkey="media_prev" aria-label="Morceau précédent">${MI.media_prev}</button><button class="pp" data-mkey="media_play_pause" aria-label="Lecture / pause">${MI.play}</button><button data-mkey="media_next" aria-label="Morceau suivant">${MI.media_next}</button></div>
@@ -673,8 +679,8 @@ function drawEditor(confirmDel) {
     $("#sheetRoot").innerHTML = `<div class="scrim" data-act="scrim"><div class="sheet" role="dialog" aria-modal="true">
       <h2>${d.isNew ? "Nouvelle case" : "Musique en cours"}</h2>${typeRow}
       <div class="help">Affiche ce qui joue sur le PC (Deezer, Spotify, YouTube…) : pochette, titre, artiste, avancement, avec précédent / lecture / suivant. Il faut Stream Deck PC à jour sur le PC.</div>
-      <h3>Taille</h3><div class="chips"><button class="chip" data-size="1" aria-pressed="${d.w !== 2}">1 case</button><button class="chip" data-size="2" aria-pressed="${d.w === 2}">2 cases (large)</button></div>
-      ${d.w === 2 ? `<p class="hint-s">En large, la case à sa droite doit rester libre.</p>` : ""}
+      <h3>Taille</h3><div class="chips">${[1, 2, 3].map(n => `<button class="chip" data-size="${n}" aria-pressed="${(d.w || 1) === n}">${n} case${n > 1 ? "s" : ""}</button>`).join("")}</div>
+      ${(d.w || 1) > 1 ? `<p class="hint-s">Les ${d.w - 1 > 1 ? d.w - 1 + " cases" : "case"} à sa droite doivent rester libres, sur la même ligne.</p>` : ""}
       <h3>Couleur</h3><div class="chips">${Object.entries(COLORS).map(([k, v]) => `<button class="sw" style="--c:${v}" data-color="${k}" aria-pressed="${d.color === k}" aria-label="${k}"></button>`).join("")}</div>
       ${confirmDel ? `<div class="confirm"><span>Supprimer la case musique ?</span><button class="btn" data-act="keep">Garder</button><button class="btn danger solid" data-act="del-yes">Supprimer</button></div>` : ""}
       <div class="foot">${d.isNew ? "" : `<button class="btn danger left" data-act="del">Supprimer</button>`}<button class="btn" data-act="close">Annuler</button><button class="btn primary" data-act="save-tile">Enregistrer</button></div>
@@ -751,7 +757,7 @@ function openGuide() {
     <details><summary>6. Personnaliser les boutons</summary><div class="gbody"><ul>
       <li>Touche le <b>crayon</b> en haut : les boutons bougent légèrement, touche-en un pour le modifier (nom, couleur, icône, touche envoyée).</li>
       <li>Pour changer de page, <b>glisse vers la gauche ou la droite</b> n'importe où sur la grille (ou touche le nom de la page en haut).</li>
-      <li>Case <b>Musique en cours</b> : en modification, touche une case vide puis choisis <b>Musique en cours</b>. Elle affiche ce qui joue sur le PC (Deezer, Spotify…) avec précédent / lecture / suivant.</li>
+      <li>Case <b>Musique en cours</b> : en modification, touche une case vide puis choisis <b>Musique en cours</b> (1, 2 ou 3 cases de large). Elle affiche ce qui joue sur le PC (Deezer, Spotify…) avec précédent / lecture / suivant.</li>
       <li>Pour <b>déplacer</b> un bouton, fais-le glisser : sur une case vide il s'y pose, sur un autre bouton ils échangent leur place, sur un onglet il part dans cette page.</li>
       <li>Touche une <b>case vide (+)</b> pour créer un bouton à cet endroit. <b>+ Page</b> crée une page.</li>
       <li><b>Bouton à état</b> : le bouton reste allumé tant que c'est actif (micro coupé, voix activée…).</li>
@@ -801,7 +807,13 @@ document.addEventListener("click", async e => {
     readDraft(); const isNew = draft.isNew; delete draft.isNew;
     if (isNew) placeTile(pageTiles(), draft, addAt); else { for (const p of st.pages) { const j = p.tiles.findIndex(x => x && x.id === draft.id); if (j >= 0) p.tiles[j] = draft; } }
     if (!draft.toggle) delete st.states[draft.id];
-    save(); $("#sheetRoot").innerHTML = ""; draft = null; renderGrid(); toast(isNew ? "Bouton ajouté." : "Bouton enregistré.");
+    let room = "";
+    if (draft.kind === "media" && draft.w > 1) {
+      const tl = pageTiles(), i = tl.findIndex(x => x && x.id === draft.id), cols = Math.max(2, Math.min(innerWidth < 640 ? 3 : 8, st.cols));
+      let free = 1; while (free < draft.w && i % cols + free < cols && !tl[i + free]) free++;
+      if (i >= 0 && free < draft.w) room = ` Libère ${draft.w - 1 > 1 ? "les " + (draft.w - 1) + " cases" : "la case"} à sa droite (ou déplace-la en début de ligne) pour l'avoir sur ${draft.w} cases.`;
+    }
+    save(); $("#sheetRoot").innerHTML = ""; draft = null; renderGrid(); toast((isNew ? "Case ajoutée." : "Enregistré.") + room, room ? 5000 : 2400);
   }
   else if (act === "del") { readDraft(); drawEditor(true); }
   else if (act === "keep") drawEditor();
