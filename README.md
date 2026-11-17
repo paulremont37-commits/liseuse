@@ -44,7 +44,9 @@ La même coque fait aussi un Stream Deck : la tablette devient une grille de gro
 | `StreamDeckPC.exe` | Sur le PC (Windows) |
 
 1. Sur le PC, lance `StreamDeckPC.exe`. Windows peut afficher « Windows a protégé votre ordinateur » : clique sur **Informations complémentaires**, puis **Exécuter quand même**. Si le pare-feu demande, autorise les **réseaux privés**.
-2. La fenêtre affiche une adresse et un code à 6 chiffres. Tape-les sur la tablette.
+2. La fenêtre affiche une adresse et un code à 6 chiffres. Tape-les sur la tablette. Elle montre aussi si la tablette est connectée, la latence et chaque appui reçu.
+
+Fermer la fenêtre range le programme près de l'horloge (il continue de marcher) ; clic droit sur l'icône → **Quitter** pour l'arrêter. `StreamDeckPC.exe --console` lance l'ancienne version en invite de commande.
 3. Pour assigner un bouton dans Discord, Voicemod ou Medal : clique sur le champ du raccourci dans le logiciel, puis appuie sur le bouton de la tablette.
 
 Le programme PC n'exécute que des raccourcis clavier et des touches multimédia : aucune commande ni aucun fichier ne peut être lancé depuis la tablette, et il faut le code pour s'y connecter.

@@ -7,13 +7,19 @@ Sécurité :
   (aucune commande, aucun fichier, aucun programme lancé à distance).
 
 Sous un autre système que Windows (ou avec DECK_DRYRUN=1), les touches sont seulement affichées.
+
+Lancement : fenêtre (gui.py) par défaut, icône près de l'horloge quand on la ferme.
+  --tray      démarre directement réduit près de l'horloge (démarrage avec Windows)
+  --console   ancienne version dans l'invite de commande
 """
 import asyncio
+import collections
 import json
 import os
 import secrets
 import socket
 import sys
+import threading
 import time
 
 import websockets
@@ -122,11 +128,18 @@ def load_config():
         cfg = {}
     if not str(cfg.get("code", "")).isdigit() or len(str(cfg.get("code"))) != 6:
         cfg["code"] = f"{secrets.randbelow(10**6):06d}"
-        with open(p, "w", encoding="utf-8") as f:
-            json.dump(cfg, f)
+        save_config(cfg)
     if os.environ.get("DECK_CODE"):
         cfg["code"] = os.environ["DECK_CODE"]
     return cfg
+
+
+def save_config(cfg):
+    try:
+        with open(config_path(), "w", encoding="utf-8") as f:
+            json.dump(cfg, f)
+    except OSError:
+        pass
 
 
 def local_ip():
@@ -140,15 +153,16 @@ def local_ip():
         s.close()
 
 
-def log(msg):
-    print(time.strftime("[%H:%M:%S] ") + msg, flush=True)
-
-
 def startup_file():
     appdata = os.environ.get("APPDATA")
     if not appdata:
         return None
     return os.path.join(appdata, r"Microsoft\Windows\Start Menu\Programs\Startup", "StreamDeckPC.cmd")
+
+
+def autostart_on():
+    f = startup_file()
+    return bool(f and os.path.exists(f))
 
 
 def set_autostart(on):
@@ -157,10 +171,76 @@ def set_autostart(on):
         return False
     if on:
         with open(f, "w", encoding="utf-8") as h:
-            h.write(f'@start "" /min "{sys.executable}"\r\n')
+            # --tray : au démarrage de Windows, on se range directement près de l'horloge
+            h.write(f'@start "" "{sys.executable}" --tray\r\n')
     elif os.path.exists(f):
         os.remove(f)
     return True
+
+# --------------------------------------------------------------------------- état partagé (serveur ↔ fenêtre)
+
+class State:
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.cfg = load_config()
+        self.code = self.cfg["code"]
+        self.ip = local_ip()
+        self.port = PORT
+        self.error = ""
+        self.listening = False
+        self.clients = {}            # websocket -> {"ip", "since", "latency"}
+        self.events = collections.deque(maxlen=60)
+        self.seq = 0
+        self.presses = 0
+        self.loop = None
+
+    def event(self, kind, text, **extra):
+        with self.lock:
+            self.seq += 1
+            self.events.append({"seq": self.seq, "t": time.time(), "kind": kind, "text": text, **extra})
+        if sys.stdout:
+            try:
+                print(time.strftime("[%H:%M:%S] ") + text, flush=True)
+            except (OSError, ValueError):
+                pass
+
+    def snapshot(self, since=0):
+        with self.lock:
+            tablets = []
+            for ws, c in self.clients.items():
+                lat = getattr(ws, "latency", 0) or 0
+                tablets.append({"ip": c["ip"], "since": c["since"], "latency": round(lat * 1000) if lat else None})
+            return {
+                "app": APP, "ip": self.ip, "port": self.port, "code": self.code, "error": self.error,
+                "listening": self.listening, "dryrun": DRYRUN, "host": socket.gethostname(),
+                "tablets": tablets, "presses": self.presses,
+                "events": [e for e in self.events if e["seq"] > since], "seq": self.seq,
+                "autostart": autostart_on(), "canAutostart": bool(getattr(sys, "frozen", False) and sys.platform == "win32"),
+                "askAutostart": not self.cfg.get("askedAutostart") and bool(getattr(sys, "frozen", False) and sys.platform == "win32"),
+            }
+
+    def new_code(self):
+        """Nouveau code : les tablettes déjà reliées sont déconnectées et doivent entrer le nouveau."""
+        with self.lock:
+            self.code = f"{secrets.randbelow(10**6):06d}"
+            self.cfg["code"] = self.code
+            save_config(self.cfg)
+            clients = list(self.clients)
+        if self.loop:
+            for ws in clients:
+                asyncio.run_coroutine_threadsafe(ws.close(1000, "nouveau code"), self.loop)
+        self.event("info", "Nouveau code créé : entre-le sur la tablette.")
+        return self.code
+
+    def autostart(self):
+        return autostart_on()
+
+    def answer_autostart(self, on):
+        set_autostart(on)
+        self.cfg["askedAutostart"] = True
+        save_config(self.cfg)
+
+STATE = None
 
 # --------------------------------------------------------------------------- latence
 
@@ -180,12 +260,11 @@ def tune_windows():
         return
     import ctypes
     k32 = ctypes.WinDLL("kernel32", use_last_error=True)
-    # 1. Désactive la « sélection rapide » de la console : un clic dans la fenêtre
-    #    mettait le programme en pause (et les appuis en attente) jusqu'à la touche Entrée.
+    # 1. Mode console : désactive la « sélection rapide », un clic dans la fenêtre mettait tout en pause.
     try:
         h = k32.GetStdHandle(-10)  # STD_INPUT_HANDLE
         mode = ctypes.c_uint32()
-        if k32.GetConsoleMode(h, ctypes.byref(mode)):
+        if h and k32.GetConsoleMode(h, ctypes.byref(mode)):
             ENABLE_QUICK_EDIT, ENABLE_EXTENDED_FLAGS = 0x0040, 0x0080
             k32.SetConsoleMode(h, (mode.value & ~ENABLE_QUICK_EDIT) | ENABLE_EXTENDED_FLAGS)
     except OSError:
@@ -199,11 +278,11 @@ def tune_windows():
 
 # --------------------------------------------------------------------------- serveur
 
-CODE = None
 FAILS = {}  # ip -> (nombre d'échecs, heure du dernier)
 
 
 async def handler(ws):
+    st = STATE
     ip = ws.remote_address[0] if ws.remote_address else "?"
     n, last = FAILS.get(ip, (0, 0))
     if n >= 5 and time.time() - last < 60:
@@ -213,15 +292,17 @@ async def handler(ws):
         hello = json.loads(await asyncio.wait_for(ws.recv(), 10))
     except Exception:
         return
-    if hello.get("type") != "hello" or not secrets.compare_digest(str(hello.get("code", "")), CODE):
+    if hello.get("type") != "hello" or not secrets.compare_digest(str(hello.get("code", "")), st.code):
         FAILS[ip] = (n + 1, time.time())
-        log(f"Code refusé depuis {ip}")
+        st.event("warn", f"Code refusé depuis {ip}")
         await ws.send(json.dumps({"type": "error", "reason": "code incorrect"}))
         return
     FAILS.pop(ip, None)
     no_delay(ws)
     await ws.send(json.dumps({"type": "ok", "name": socket.gethostname(), "version": 1}))
-    log(f"Tablette connectée ({ip})")
+    with st.lock:
+        st.clients[ws] = {"ip": ip, "since": time.time()}
+    st.event("on", f"Tablette connectée ({ip})")
     try:
         async for raw in ws:
             try:
@@ -240,66 +321,101 @@ async def handler(ws):
                     send_keys(keys)
                     # Réponse d'abord, journal ensuite : l'affichage ne retarde jamais rien
                     await ws.send(json.dumps({"type": "result", "id": msg.get("id"), "ok": True}))
-                    log(f"{label or 'Bouton'} → {describe(keys)}")
+                    st.presses += 1
+                    st.event("press", f"{label or 'Bouton'} → {describe(keys)}", label=label or "Bouton", keys=describe(keys))
                 except OSError as e:
-                    log(f"Échec de l'envoi de {describe(keys)} : {e}")
+                    st.event("warn", f"Windows a refusé {describe(keys)} ({e})")
                     await ws.send(json.dumps({"type": "result", "id": msg.get("id"), "ok": False, "reason": "envoi refusé par Windows"}))
     except websockets.ConnectionClosed:
         pass
-    log(f"Tablette déconnectée ({ip})")
+    finally:
+        with st.lock:
+            st.clients.pop(ws, None)
+    st.event("off", f"Tablette déconnectée ({ip})")
 
 
-async def main():
-    global CODE
-    cfg = load_config()
-    CODE = cfg["code"]
-    ip = local_ip()
+async def serve(st):
+    st.loop = asyncio.get_running_loop()
+    # compression=None : messages minuscules, la compression ne ferait qu'ajouter du travail
+    async with websockets.serve(handler, "0.0.0.0", st.port, ping_interval=20, ping_timeout=20, max_size=4096, compression=None):
+        st.listening = True
+        st.event("info", f"Prêt : en attente de la tablette sur le port {st.port}.")
+        while True:
+            await asyncio.sleep(30)
+            ip = local_ip()          # l'adresse peut changer (box redémarrée, Wi-Fi ↔ câble)
+            if ip != st.ip:
+                st.ip = ip
+                st.event("info", f"Nouvelle adresse du PC : {ip}")
+
+
+def run_server(st):
+    try:
+        asyncio.run(serve(st))
+    except OSError as e:
+        st.listening = False
+        st.error = (f"Le port {st.port} est déjà pris : Stream Deck PC est sûrement déjà ouvert "
+                    f"(regarde près de l'horloge). Détail : {e}")
+        st.event("warn", st.error)
+
+
+def start(st):
+    global STATE
+    STATE = st
+    t = threading.Thread(target=run_server, args=(st,), daemon=True, name="serveur")
+    t.start()
+    return t
+
+# --------------------------------------------------------------------------- lancement
+
+def console_main():
+    if sys.platform == "win32" and getattr(sys, "frozen", False) and sys.stdout is None:
+        # l'exe est une appli fenêtrée : on ouvre une console pour cette version
+        import ctypes
+        ctypes.windll.kernel32.AllocConsole()
+        sys.stdout = open("CONOUT$", "w", encoding="utf-8", buffering=1)
+        sys.stdin = open("CONIN$", encoding="utf-8")
+    st = State()
     if sys.platform == "win32":
         os.system(f"title {APP}")
     print("=" * 52)
     print(f"  {APP}")
     print("=" * 52)
-    print(f"  Sur la tablette, entre :")
-    print(f"    Adresse : {ip}")
-    print(f"    Code    : {CODE}")
+    print("  Sur la tablette, entre :")
+    print(f"    Adresse : {st.ip}")
+    print(f"    Code    : {st.code}")
     print()
     print("  Laisse cette fenêtre ouverte (tu peux la réduire).")
     if DRYRUN:
         print("  [mode test : les touches sont affichées, pas envoyées]")
     print("=" * 52, flush=True)
-    # compression=None : messages minuscules, la compression ne ferait qu'ajouter du travail
-    async with websockets.serve(handler, "0.0.0.0", PORT, ping_interval=20, ping_timeout=20, max_size=4096, compression=None):
-        log(f"En attente de la tablette sur le port {PORT}…")
-        await asyncio.Future()
-
-
-def first_run_questions():
-    """Au premier lancement de l'exe : proposer le démarrage avec Windows."""
-    if not getattr(sys, "frozen", False) or sys.platform != "win32":
-        return
-    f = startup_file()
-    marker = os.path.join(os.path.dirname(config_path()), "asked")
-    if os.path.exists(marker) or (f and os.path.exists(f)):
-        return
+    t = start(st)
     try:
-        ans = input("Lancer Stream Deck PC automatiquement au démarrage de Windows ? (O/N) ").strip().lower()
-    except EOFError:
-        ans = "n"
-    set_autostart(ans.startswith("o"))
-    open(marker, "w").close()
-    print("C'est noté." if ans.startswith("o") else "OK, tu le lanceras à la main.")
+        while t.is_alive():
+            t.join(0.5)
+    except KeyboardInterrupt:
+        pass
+    if st.error and sys.stdin:
+        try:
+            input("Appuie sur Entrée pour fermer.")
+        except EOFError:
+            pass
 
 
 if __name__ == "__main__":
     if "--no-autostart" in sys.argv:
-        print("Démarrage automatique désactivé." if set_autostart(False) else "Rien à faire.")
+        set_autostart(False)
         sys.exit(0)
-    first_run_questions()
     tune_windows()
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        pass
-    except OSError as e:
-        print(f"Impossible d'ouvrir le port {PORT} : {e}. Stream Deck PC est peut-être déjà ouvert.")
-        input("Appuie sur Entrée pour fermer.")
+    if autostart_on():
+        set_autostart(True)  # met à jour un ancien lancement automatique (ajoute --tray)
+    if "--console" in sys.argv:
+        console_main()
+    else:
+        try:
+            import gui
+        except ImportError:
+            gui = None
+        if gui is None:
+            console_main()
+        else:
+            gui.run(State(), start, tray_only="--tray" in sys.argv)
