@@ -466,12 +466,13 @@ document.addEventListener("pointerdown", e => {
   if (e.pointerType === "mouse" && e.button !== 0) return;
   const el = e.target.closest("#grid .tile[data-tile]");
   const mk = e.target.closest("[data-mkey]");
-  gest = { pid: e.pointerId, x0: e.clientX, y0: e.clientY, t0: performance.now(), el, mk, swipe: false, dead: false };
+  gest = { pid: e.pointerId, x0: e.clientX, y0: e.clientY, t0: performance.now(), el, mk, swipe: false, dead: false, dx: 0, pts: [[performance.now(), e.clientX]] };
   if (mk) mk.classList.add("down"); else if (el) el.classList.add("down");
 }, true);
 addEventListener("pointermove", e => {
   const g = gest; if (!g || e.pointerId !== g.pid) return;
   const dx = e.clientX - g.x0, dy = e.clientY - g.y0;
+  g.dx = dx; const now = performance.now(); g.pts.push([now, e.clientX]); while (g.pts.length > 2 && now - g.pts[0][0] > 120) g.pts.shift();
   if (!g.swipe && !g.dead) {
     if (Math.abs(dx) > 22 && Math.abs(dx) > Math.abs(dy) * 1.3 && st.pages.length > 1) {
       g.swipe = true; unpress(g); grid.style.transition = "none";
@@ -488,12 +489,7 @@ addEventListener("pointerup", e => {
   const g = gest; if (!g || e.pointerId !== g.pid) return;
   gest = null; unpress(g);
   const dx = e.clientX - g.x0, dt = performance.now() - g.t0;
-  if (g.swipe) {
-    swallowClick = true; setTimeout(() => { swallowClick = false; }, 60);
-    const dir = (Math.abs(dx) > innerWidth * 0.18 || Math.abs(dx) / dt > 0.5) ? (dx < 0 ? 1 : -1) : 0;
-    goPage(st.page + dir, dir);
-    return;
-  }
+  if (g.swipe) { endSwipe(g, dx); return; }
   if (g.dead || !g.el) return;
   const t = findTile(g.el.dataset.tile); if (!t) return;
   if (t.kind === "media") { mediaPress(g.mk ? g.mk.dataset.mkey : "media_play_pause", g.mk || g.el); return; }
@@ -501,8 +497,19 @@ addEventListener("pointerup", e => {
 });
 addEventListener("pointercancel", e => {
   const g = gest; if (!g || e.pointerId !== g.pid) return;
-  gest = null; unpress(g); if (g.swipe) goPage(st.page, 0);
+  gest = null; unpress(g);
+  // Si Android reprend le geste en cours de route, on décide quand même avec le dernier mouvement connu
+  if (g.swipe) endSwipe(g, g.dx);
 });
+function endSwipe(g, dx) {
+  swallowClick = true; setTimeout(() => { swallowClick = false; }, 60);
+  const a = g.pts[0], z = g.pts[g.pts.length - 1];
+  const v = z[0] > a[0] ? (z[1] - a[1]) / (z[0] - a[0]) : 0;           // px/ms sur les ~120 dernières ms
+  let dir = 0;
+  if (Math.abs(v) > 0.25 && Math.sign(v) === Math.sign(dx)) dir = dx < 0 ? 1 : -1;      // geste vif
+  else if (Math.abs(dx) > Math.max(70, innerWidth * 0.12)) dir = dx < 0 ? 1 : -1;      // glissé assez long
+  goPage(st.page + dir, dir);
+}
 document.addEventListener("click", e => { if (swallowClick) { swallowClick = false; e.stopPropagation(); e.preventDefault(); } }, true);
 function goPage(n, dir) {
   const ok = n >= 0 && n < st.pages.length && n !== st.page;
@@ -666,6 +673,7 @@ function openSettings(confirmReset) {
     <div class="toggle-row"><div>Colonnes</div><div class="chips">${[3, 4, 5, 6, 7].map(n => `<button class="chip" data-cols="${n}" aria-pressed="${st.cols === n}">${n}</button>`).join("")}</div></div>
     <div class="toggle-row"><div>Page « ${esc(st.pages[st.page].name)} »<small>Renommer ou supprimer la page affichée.</small></div><div class="chips"><button class="chip" data-act="rename-page">Renommer</button>${st.pages.length > 1 ? `<button class="chip" data-act="del-page">Supprimer</button>` : ""}</div></div>
     <div class="toggle-row"><div>États des boutons<small>Si un bouton affiche « Coupé » alors que ce n'est plus le cas.</small></div><button class="btn" data-act="reset-states">Tout éteindre</button></div>
+    ${AND ? `<div class="toggle-row"><div>Version<small>Appli ${esc(call("appVersion") || "?")} · interface ${esc(call("webVersion") || "?")}</small></div></div>` : ""}
     <div class="toggle-row"><div>Guide<small>Installation, Discord, Voicemod, Medal, personnalisation, dépannage.</small></div><button class="btn primary" data-act="guide">Ouvrir le guide</button></div>
     ${AND ? `<h3>Tablette</h3><div class="chips"><button class="chip" data-native="openWifi">Wi-Fi</button><button class="chip" data-native="openSettings">Réglages Android</button><button class="chip" data-native="openSamsungHome">Écran d'accueil Samsung</button><button class="chip" data-native="checkUpdate">Mise à jour</button></div>` : ""}
     ${confirmReset ? `<div class="confirm"><span>Remettre tous les boutons d'origine ? Tes modifications seront perdues.</span><button class="btn" data-act="keep-set">Annuler</button><button class="btn danger solid" data-act="reset-yes">Remettre</button></div>` : ""}
