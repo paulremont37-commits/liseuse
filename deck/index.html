@@ -61,7 +61,15 @@ button{cursor:pointer}
 @keyframes flash{from{opacity:1}to{opacity:0}}
 .tile.add{border-style:dashed;background:none;--c:var(--muted)}
 .tile.ghost{visibility:hidden}
-.editing .tile:not(.add){animation:wob 1.6s ease-in-out infinite}
+.editing .tile{touch-action:none}
+.tile.slot{border:2px dashed var(--line);background:none;box-shadow:none;--c:var(--muted);opacity:.55}
+.tile.slot svg{width:clamp(22px,22%,40px);filter:none}
+.dragmode .tile.slot{opacity:.9}
+.tile.lifted{opacity:.18;animation:none!important}
+.tile.dragging{position:fixed;z-index:40;margin:0;pointer-events:none;animation:none!important;border-color:var(--c);box-shadow:0 0 40px -4px var(--c),0 18px 40px rgba(0,0,0,.8),inset 0 0 40px -10px var(--c);transition:none}
+.tile.drop{border-style:solid;border-color:var(--music)!important;opacity:1;box-shadow:0 0 0 2px var(--music),0 0 26px -2px var(--music)!important}
+.tab.drop{color:var(--music);background:color-mix(in srgb,var(--music) 14%,transparent);box-shadow:0 0 16px -4px var(--music)}
+.editing .tile:not(.slot){animation:wob 1.6s ease-in-out infinite}
 .editing .tile:nth-child(2n){animation-delay:-.8s}
 @keyframes wob{50%{transform:rotate(.6deg)}}
 
@@ -249,7 +257,9 @@ function defaults() {
 /* ---------------- état ---------------- */
 let st = { pc: null, code: "", cols: 5, pages: defaults(), page: 0, states: {}, seenHelp: false };
 try { const s = JSON.parse(localStorage.getItem("deck.v1") || "null"); if (s && Array.isArray(s.pages)) st = Object.assign(st, s); } catch (e) {}
-const save = () => { try { localStorage.setItem("deck.v1", JSON.stringify(st)); } catch (e) {} };
+// Une page = une liste de cases ; null = case vide (les boutons gardent la place où on les a mis).
+const trimPages = () => st.pages.forEach(p => { p.tiles = p.tiles || []; while (p.tiles.length && !p.tiles[p.tiles.length - 1]) p.tiles.pop(); });
+const save = () => { trimPages(); try { localStorage.setItem("deck.v1", JSON.stringify(st)); } catch (e) {} };
 let editing = false;
 
 /* ---------------- connexion au PC ---------------- */
@@ -327,12 +337,20 @@ function tileHTML(t) {
 }
 function renderGrid() {
   const page = st.pages[st.page] || st.pages[0]; if (!page) return;
-  const g = $("#grid"); const n = page.tiles.length + (editing ? 1 : 0);
+  trimPages();
+  const g = $("#grid"); const tiles = page.tiles;
   const cols = Math.max(2, Math.min(innerWidth < 640 ? 3 : 8, st.cols));
-  const rows = Math.max(Math.ceil(n / cols), innerWidth < 640 ? 4 : 3);
+  // En modification, toujours au moins une case libre après le dernier bouton
+  const rows = Math.max(Math.ceil((tiles.length + (editing ? 1 : 0)) / cols), innerWidth < 640 ? 4 : 3);
   g.style.gridTemplateColumns = `repeat(${cols},minmax(0,1fr))`; g.style.gridTemplateRows = `repeat(${rows},minmax(0,1fr))`;
   g.classList.toggle("editing", editing);
-  g.innerHTML = page.tiles.map(tileHTML).join("") + (editing ? `<button class="tile add" data-act="add-tile">${PLUS}<span class="lbl">Ajouter</span></button>` : "");
+  const count = editing ? rows * cols : tiles.length;
+  let html = "";
+  for (let i = 0; i < count; i++) {
+    const t = tiles[i];
+    html += t ? tileHTML(t) : editing ? `<button class="tile slot" data-slot="${i}" aria-label="Ajouter un bouton ici">${PLUS}</button>` : `<div class="tile ghost" aria-hidden="true"></div>`;
+  }
+  g.innerHTML = html;
 }
 function render() { renderTabs(); renderGrid(); $("#editBtn").setAttribute("aria-pressed", String(editing)); }
 function showDeck() { $("#setup").hidden = true; $("#grid").hidden = false; render(); }
@@ -352,16 +370,77 @@ function showSetup(msg) {
 const grid = $("#grid");
 // Le raccourci part dès que le doigt touche le bouton (pas au relâchement) : on gagne le temps d'appui.
 grid.addEventListener("pointerdown", e => {
-  const el = e.target.closest(".tile"); if (!el || el.classList.contains("add")) return;
+  const el = e.target.closest(".tile"); if (!el || el.classList.contains("slot") || el.classList.contains("ghost")) return;
   if (e.pointerType === "mouse" && e.button !== 0) return;
+  if (editing) { startDrag(e, el); return; }
   el.classList.add("down");
-  if (editing) return;
   const t = findTile(el.dataset.tile); if (t) press(t);
 });
 ["pointerup", "pointercancel", "pointerleave"].forEach(ev => grid.addEventListener(ev, e => { const el = e.target.closest && e.target.closest(".tile"); if (el) el.classList.remove("down"); }, true));
+
+/* ---- déplacer les boutons (mode modification) : glisser sur une case, un bouton ou un onglet ---- */
+function placeTile(tiles, t, at) {
+  if (at >= 0) { while (tiles.length < at) tiles.push(null); if (!tiles[at]) { tiles[at] = t; return; } }
+  const free = tiles.indexOf(null);
+  if (free >= 0) tiles[free] = t; else tiles.push(t);
+}
+let drag = null, skipClick = false;
+function startDrag(e, el) {
+  drag = { id: el.dataset.tile, el, pid: e.pointerId, x0: e.clientX, y0: e.clientY, on: false, clone: null, target: null };
+}
+function dropTarget(x, y) {
+  const under = document.elementFromPoint(x, y);
+  const t = under && under.closest(".grid .tile[data-tile], .grid .tile.slot, .tab[data-page]");
+  if (!t || t === drag.el) return null;
+  if (t.matches(".tab") && +t.dataset.page === st.page) return null;
+  return t;
+}
+addEventListener("pointermove", e => {
+  if (!drag || e.pointerId !== drag.pid) return;
+  const dx = e.clientX - drag.x0, dy = e.clientY - drag.y0;
+  if (!drag.on) {
+    if (Math.hypot(dx, dy) < 10) return;
+    drag.on = true;
+    const r = drag.el.getBoundingClientRect();
+    const c = drag.el.cloneNode(true); c.classList.add("dragging"); c.removeAttribute("data-tile");
+    Object.assign(c.style, { width: r.width + "px", height: r.height + "px", left: r.left + "px", top: r.top + "px" });
+    document.body.appendChild(c); drag.clone = c; drag.el.classList.add("lifted");
+    grid.classList.add("dragmode");
+    try { navigator.vibrate && navigator.vibrate(8); } catch (x) {}
+  }
+  drag.clone.style.transform = `translate(${dx}px,${dy}px) scale(1.06)`;
+  const t = dropTarget(e.clientX, e.clientY);
+  if (t !== drag.target) { if (drag.target) drag.target.classList.remove("drop"); drag.target = t; if (t) t.classList.add("drop"); }
+}, { passive: true });
+function endDrag(e, cancel) {
+  if (!drag || (e && e.pointerId !== drag.pid)) return;
+  const d = drag; drag = null;
+  grid.classList.remove("dragmode");
+  if (!d.on) return;           // simple toucher : le clic ouvrira l'éditeur
+  skipClick = true; setTimeout(() => { skipClick = false; }, 60);
+  d.clone.remove(); d.el.classList.remove("lifted"); if (d.target) d.target.classList.remove("drop");
+  if (cancel || !d.target) return;
+  const tiles = pageTiles(); const from = tiles.findIndex(x => x && x.id === d.id); if (from < 0) return;
+  const tile = tiles[from];
+  if (d.target.matches(".tab")) {
+    const dest = st.pages[+d.target.dataset.page]; if (!dest) return;
+    tiles[from] = null; placeTile(dest.tiles, tile, -1);
+    save(); renderGrid(); toast(`« ${tile.label} » déplacé dans « ${dest.name} ».`);
+    return;
+  }
+  const to = d.target.dataset.slot != null ? +d.target.dataset.slot : tiles.findIndex(x => x && x.id === d.target.dataset.tile);
+  if (to < 0) return;
+  while (tiles.length <= to) tiles.push(null);
+  tiles[from] = tiles[to]; tiles[to] = tile;   // case vide : on s'y pose ; bouton : on échange
+  save(); renderGrid();
+}
+addEventListener("pointerup", e => endDrag(e, false));
+addEventListener("pointercancel", e => endDrag(e, true));
+
 grid.addEventListener("click", e => {
   const el = e.target.closest(".tile"); if (!el) return;
-  if (el.dataset.act === "add-tile") return openEditor(null);
+  if (skipClick) { skipClick = false; return; }
+  if (el.classList.contains("slot")) return openEditor(null, +el.dataset.slot);
   const t = findTile(el.dataset.tile); if (!t) return;
   if (editing) return openEditor(t);
   if (e.detail === 0) press(t); // clavier ou accessibilité : pas de pointerdown
@@ -376,12 +455,14 @@ async function press(t) {
   if (cur) { cur.classList.remove("ok", "fail"); void cur.offsetWidth; cur.classList.add(r.ok ? "ok" : "fail"); }
   if (!r.ok) toast(r.reason === "PC non connecté" ? "PC non connecté. Vérifie que Stream Deck PC est ouvert." : `Échec : ${r.reason}.`);
 }
-function findTile(id) { for (const p of st.pages) for (const t of p.tiles) if (t.id === id) return t; return null; }
+function findTile(id) { for (const p of st.pages) for (const t of p.tiles) if (t && t.id === id) return t; return null; }
 
 /* ---------------- éditeur ---------------- */
 let draft = null;
 const KEYS = [...Array.from({ length: 24 }, (_, i) => "f" + (i + 1)), ..."abcdefghijklmnopqrstuvwxyz0123456789".split("")];
-function openEditor(t) {
+let addAt = -1;
+function openEditor(t, slot) {
+  addAt = t ? -1 : (slot == null ? -1 : slot);
   draft = t ? JSON.parse(JSON.stringify(t)) : { id: uid(), label: "Nouveau", icon: "star", color: "sound", keys: ["ctrl", "shift", "f21"], toggle: false, onLabel: "Actif", onColor: "clip", isNew: true };
   drawEditor();
 }
@@ -453,7 +534,8 @@ function openGuide() {
     <details><summary>5. Brancher Medal</summary><div class="gbody">Dans Medal, ouvre les réglages des clips, clique sur la touche qui enregistre un clip, puis appuie sur <b>Clip</b>. Après un but, un appui suffit pour garder l'action.</div></details>
     <details><summary>6. Personnaliser les boutons</summary><div class="gbody"><ul>
       <li>Touche le <b>crayon</b> en haut : les boutons bougent légèrement, touche-en un pour le modifier (nom, couleur, icône, touche envoyée).</li>
-      <li><b>Ajouter</b> crée un nouveau bouton sur la page affichée, <b>+ Page</b> crée une page.</li>
+      <li>Pour <b>déplacer</b> un bouton, fais-le glisser : sur une case vide il s'y pose, sur un autre bouton ils échangent leur place, sur un onglet il part dans cette page.</li>
+      <li>Touche une <b>case vide (+)</b> pour créer un bouton à cet endroit. <b>+ Page</b> crée une page.</li>
       <li><b>Bouton à état</b> : le bouton reste allumé tant que c'est actif (micro coupé, voix activée…).</li>
       <li><b>Tester</b> envoie la touche tout de suite, pratique pour l'assigner dans un logiciel.</li>
       <li>Réglages → <b>Colonnes</b> pour des boutons plus grands ou plus petits.</li></ul></div></details>
@@ -476,7 +558,7 @@ document.addEventListener("click", async e => {
   const t = e.target;
   const pg = t.closest("[data-page]"); if (pg) { st.page = +pg.dataset.page; save(); render(); return; }
   const nat = t.closest("[data-native]"); if (nat) { call(nat.dataset.native); return; }
-  if (t.closest("#editBtn")) { editing = !editing; render(); if (editing) toast("Touche un bouton pour le modifier."); return; }
+  if (t.closest("#editBtn")) { editing = !editing; render(); if (editing) toast("Touche un bouton pour le modifier, fais-le glisser pour le déplacer.", 3200); return; }
   if (t.closest("#setBtn")) { openSettings(); return; }
   if (draft && $("#sheetRoot").innerHTML) {
     const c = t.closest("[data-color]"); if (c) { readDraft(); draft.color = c.dataset.color; drawEditor(); return; }
@@ -495,13 +577,13 @@ document.addEventListener("click", async e => {
   else if (act === "test") { readDraft(); const r = await sendKeys(draft.keys, draft.label); toast(r.ok ? `Envoyé : ${describe(draft.keys)}` : `Échec : ${r.reason}.`); drawEditor(); }
   else if (act === "save-tile") {
     readDraft(); const isNew = draft.isNew; delete draft.isNew;
-    if (isNew) pageTiles().push(draft); else { const tiles = pageTiles(); const i = tiles.findIndex(x => x.id === draft.id); if (i >= 0) tiles[i] = draft; else for (const p of st.pages) { const j = p.tiles.findIndex(x => x.id === draft.id); if (j >= 0) p.tiles[j] = draft; } }
+    if (isNew) placeTile(pageTiles(), draft, addAt); else { for (const p of st.pages) { const j = p.tiles.findIndex(x => x && x.id === draft.id); if (j >= 0) p.tiles[j] = draft; } }
     if (!draft.toggle) delete st.states[draft.id];
     save(); $("#sheetRoot").innerHTML = ""; draft = null; renderGrid(); toast(isNew ? "Bouton ajouté." : "Bouton enregistré.");
   }
   else if (act === "del") { readDraft(); drawEditor(true); }
   else if (act === "keep") drawEditor();
-  else if (act === "del-yes") { for (const p of st.pages) p.tiles = p.tiles.filter(x => x.id !== draft.id); delete st.states[draft.id]; save(); $("#sheetRoot").innerHTML = ""; draft = null; renderGrid(); toast("Bouton supprimé."); }
+  else if (act === "del-yes") { for (const p of st.pages) p.tiles = p.tiles.map(x => x && x.id === draft.id ? null : x); delete st.states[draft.id]; save(); $("#sheetRoot").innerHTML = ""; draft = null; renderGrid(); toast("Bouton supprimé."); }
   else if (act === "add-page") { st.pages.push({ id: uid(), name: "Page " + (st.pages.length + 1), tiles: [] }); st.page = st.pages.length - 1; save(); render(); }
   else if (act === "rename-page") { $("#sheetRoot").innerHTML = `<div class="scrim" data-act="scrim"><div class="sheet"><h2>Renommer la page</h2><label class="field"><span>Nom</span><input id="pName" maxlength="20" value="${esc(st.pages[st.page].name)}"></label><div class="foot"><button class="btn" data-act="close">Annuler</button><button class="btn primary" data-act="save-page">Enregistrer</button></div></div></div>` }
   else if (act === "save-page") { const v = $("#pName").value.trim(); if (v) st.pages[st.page].name = v; save(); $("#sheetRoot").innerHTML = ""; render(); }
