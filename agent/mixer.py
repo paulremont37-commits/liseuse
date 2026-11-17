@@ -78,9 +78,12 @@ def _sessions():
 
 def state():
     """État complet du mixer (appelé dans le fil COM)."""
-    m = _master()
-    out = {"type": "mixer", "ok": True,
-           "master": {"vol": round(m.GetMasterVolumeLevelScalar() * 100), "mute": bool(m.GetMute())}, "apps": []}
+    try:
+        m = _master()
+        master = {"vol": round(m.GetMasterVolumeLevelScalar() * 100), "mute": bool(m.GetMute())}
+    except Exception:
+        master = None  # pas de haut-parleur / casque par défaut : on affiche quand même les applis
+    out = {"type": "mixer", "ok": True, "master": master, "apps": []}
     for g in _sessions().values():
         vols, mutes = [], []
         for s in g["sessions"]:

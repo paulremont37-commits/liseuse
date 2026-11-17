@@ -95,6 +95,30 @@ button{cursor:pointer}
 .tile.media.w3 .mt{-webkit-line-clamp:2;font-size:clamp(17px,2.3vw,30px)}
 .tile.media.w3 .ma{font-size:clamp(13px,1.5vw,18px)}
 .tile.media.w3 .mctl button{width:clamp(40px,4.4vw,58px);height:clamp(40px,4.4vw,58px)}
+.tile.mixertile .keys{opacity:1}
+.sheet.mixer{width:min(900px,100%);padding:20px 22px 24px}
+.mxhead{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.mxhead h2{display:flex;align-items:center;gap:10px;margin:0}.mxhead h2 svg{width:26px;height:26px;color:var(--mod);filter:drop-shadow(0 0 6px var(--mod))}
+.mxpc{color:var(--muted);font-weight:600;margin-right:auto}
+.mxh{margin:18px 0 6px}
+.mxnote{color:var(--muted);line-height:1.5;margin:14px 0}
+.mrow{display:grid;grid-template-columns:44px minmax(90px,170px) minmax(0,1fr) 40px 52px;align-items:center;gap:14px;padding:8px 0;border-top:1px solid var(--line)}
+.mrow.big{border-top:0;padding:6px 0 14px}
+.mbadge{width:44px;height:44px;border-radius:13px;display:grid;place-items:center;font-family:var(--f-display);font-weight:800;font-size:20px;color:var(--c);border:1.5px solid color-mix(in srgb,var(--c) 60%,transparent);box-shadow:0 0 14px -4px var(--c),inset 0 0 12px -6px var(--c);text-shadow:0 0 8px var(--c)}
+.mbadge svg{width:22px;height:22px}
+.mname{min-width:0}.mname b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.mname small{color:var(--muted);font-size:12.5px}
+.mval{font-variant-numeric:tabular-nums;font-weight:700;text-align:right;color:var(--c)}
+.mrow input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:48px;background:transparent;margin:0;touch-action:none}
+.mrow input[type=range]::-webkit-slider-runnable-track{height:8px;border-radius:5px;background:linear-gradient(90deg,var(--c) 0 var(--p),rgba(255,255,255,.12) var(--p) 100%);box-shadow:0 0 12px -3px var(--c)}
+.mrow input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:30px;height:30px;margin-top:-11px;border-radius:50%;background:#000;border:3px solid var(--c);box-shadow:0 0 14px var(--c)}
+.mrow input[type=range]::-moz-range-track{height:8px;border-radius:5px;background:linear-gradient(90deg,var(--c) 0 var(--p),rgba(255,255,255,.12) var(--p) 100%)}
+.mrow input[type=range]::-moz-range-thumb{width:26px;height:26px;border-radius:50%;background:#000;border:3px solid var(--c)}
+.mmute{width:52px;height:46px;border-radius:13px;border:1px solid var(--line);background:#0b0b11;display:grid;place-items:center;color:var(--fg)}
+.mmute svg{width:22px;height:22px}
+.mmute[aria-pressed="true"]{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 60%,transparent);box-shadow:0 0 14px -4px var(--bad)}
+.mrow.muted input[type=range]{opacity:.35}.mrow.muted .mval{color:var(--muted)}
+.mrow.big .mname b{font-size:17px}
+@media (max-width:640px){.mrow{grid-template-columns:40px minmax(0,1fr) 46px;grid-template-areas:"b n m" "r r v"}.mbadge{grid-area:b;width:40px;height:40px}.mname{grid-area:n}.mmute{grid-area:m;width:46px}.mrow input[type=range]{grid-area:r}.mval{grid-area:v}}
 .hint-s{color:var(--muted);font-size:13px;margin:8px 0 0}
 .grid{will-change:transform}
 /* La grille gère elle-même les gestes : sans ça, Android « vole » le glissé pour faire défiler
@@ -257,6 +281,7 @@ const ICONS = {
   voldown: P('<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M15 12h6"/>'),
   volmute: P('<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 9l5 6M21 9l-5 6"/>'),
   music: P('<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>'),
+  sliders: P('<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>'),
   chat: P('<path d="M4 5h16v11H9l-5 4z"/>'),
   camera: P('<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>'),
   keyboard: P('<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/>')
@@ -339,6 +364,7 @@ function connect() {
     else if (m.type === "error") { C.lastErr = m.reason || "refusé"; setStatus("err", "Code refusé"); if (!$("#setup").hidden) $("#setErr").textContent = "Le PC a refusé : " + C.lastErr + "."; ws.onclose = null; try { ws.close(); } catch (e) {} C.ws = null; }
     else if (m.type === "result") { const p = C.pending.get(m.id); if (p) { C.pending.delete(m.id); p(m.ok, m.reason); } }
     else if (m.type === "media") onMedia(m);
+    else if (m.type === "mixer") onMixer(m);
   };
   ws.onclose = () => { C.ws = null; if (C.state === "on") toast("Connexion au PC perdue. Nouvelle tentative…"); later(); };
 }
@@ -373,6 +399,7 @@ function renderTabs() {
 }
 function tileHTML(t, span) {
   if (t.kind === "media") return mediaHTML(t, span || 1);
+  if (t.kind === "mixer") return `<button class="tile mixertile" data-tile="${t.id}" style="--c:${COLORS[t.color] || COLORS.mod}">${ICONS.sliders}<span class="lbl">${esc(t.label || "Mixer")}</span><span class="keys">Volume par appli</span></button>`;
   const on = t.toggle && st.states[t.id];
   return `<button class="tile${on ? " on" : ""}" data-tile="${t.id}" style="--c:${COLORS[t.color] || COLORS.plain};--oc:${COLORS[t.onColor] || COLORS.clip}">
     <span class="flag">${esc(t.onLabel || "Actif")}</span>${ICONS[t.icon] || ICONS.keyboard}<span class="lbl">${esc(t.label)}</span><span class="keys">${esc(describe(t.keys))}</span></button>`;
@@ -467,6 +494,88 @@ function paintMedia() {
 }
 setInterval(() => { if (M.d && M.d.playing) paintMedia(); }, 500);
 
+/* ---------------- mixer : volume de chaque appli du PC ---------------- */
+const MX = { data: null, timer: 0, wait: 0, drag: null, sent: 0, pend: null };
+const MIXCOL = { discord: "voice", deezer: "pink", spotify: "mod", rocketleague: "music", chrome: "sound", msedge: "music", firefox: "clip",
+  voicemod: "lime", voicemoddesktop: "lime", medal: "clip", steam: "plain", steamwebhelper: "plain", system: "plain" };
+const VOL = { on: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg>',
+  off: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="m23 9-6 6M17 9l6 6"/></svg>' };
+function mixSend(o) { if (C.state !== "on" || !C.ws) return false; try { C.ws.send(JSON.stringify(o)); return true; } catch (e) { return false; } }
+function openMixer() {
+  $("#sheetRoot").innerHTML = `<div class="scrim" data-act="scrim"><div class="sheet mixer" role="dialog" aria-modal="true" id="mixerPanel">
+    <div class="mxhead"><h2>${ICONS.sliders} Mixer</h2><span class="mxpc">${esc(C.state === "on" ? C.name : "PC non connecté")}</span><button class="btn" data-act="close">Fermer</button></div>
+    <div id="mxBody"><p class="mxnote">${C.state === "on" ? "Chargement…" : "Relie d'abord le PC (Stream Deck PC ouvert, même Wi-Fi)."}</p></div>
+  </div></div>`;
+  MX.data = null;
+  if (C.state !== "on") return;
+  mixSend({ type: "mixer_get" });
+  clearInterval(MX.timer); clearTimeout(MX.wait);
+  MX.wait = setTimeout(() => { if (!MX.data && $("#mxBody")) $("#mxBody").innerHTML = `<p class="mxnote">Le PC ne répond pas au mixer : mets à jour <b>Stream Deck PC</b> sur le PC.</p>`; }, 2500);
+  MX.timer = setInterval(() => {
+    if (!$("#mixerPanel")) { clearInterval(MX.timer); return; }
+    if (!MX.drag) mixSend({ type: "mixer_get" });
+  }, 1000);
+}
+function mixRow(id, name, vol, mute, sub, big) {
+  const c = COLORS[MIXCOL[id]] || `hsl(${[...id].reduce((h, ch) => h + ch.charCodeAt(0) * 7, 0) % 360} 90% 62%)`;
+  return `<div class="mrow${big ? " big" : ""}${mute ? " muted" : ""}" data-mid="${esc(id)}" style="--c:${c}">
+    <span class="mbadge">${big ? VOL.on : esc(name.slice(0, 1).toUpperCase())}</span>
+    <div class="mname"><b>${esc(name)}</b><small>${esc(sub)}</small></div>
+    <input type="range" min="0" max="100" step="1" value="${vol}" data-mvol="${esc(id)}" aria-label="Volume ${esc(name)}" style="--p:${vol}%">
+    <span class="mval">${vol}</span>
+    <button class="mmute" data-mmute="${esc(id)}" aria-pressed="${mute}" aria-label="${mute ? "Réactiver" : "Couper"} ${esc(name)}">${mute ? VOL.off : VOL.on}</button>
+  </div>`;
+}
+function onMixer(m) {
+  clearTimeout(MX.wait);
+  const body = $("#mxBody"); if (!body) return;
+  if (!m.ok) { body.innerHTML = `<p class="mxnote">Mixer indisponible sur le PC : ${esc(m.reason || "erreur")}.</p>`; return; }
+  const ids = [m.master ? "master" : "", ...m.apps.map(a => a.id)].join("|");
+  MX.data = m;
+  if (body.dataset.ids !== ids) {
+    body.dataset.ids = ids;
+    body.innerHTML = (m.master ? mixRow("master", "Volume général", m.master.vol, m.master.mute, "Tout le PC", true) : `<p class="mxnote">Aucune sortie son par défaut trouvée sur le PC.</p>`) +
+      (m.apps.length ? `<h3 class="mxh">Applis</h3>` + m.apps.map(a => mixRow(a.id, a.name, a.vol, a.mute, a.active ? "joue du son" : "silencieuse", false)).join("")
+        : `<p class="mxnote">Aucune appli n'utilise le son pour l'instant. Lance Discord, Deezer ou un jeu : elle apparaîtra ici.</p>`);
+    return;
+  }
+  // mise à jour sur place (sans toucher au curseur qu'on est en train de glisser)
+  const upd = (id, vol, mute, sub) => {
+    const row = body.querySelector(`.mrow[data-mid="${CSS.escape(id)}"]`); if (!row) return;
+    const r = row.querySelector("input");
+    if (MX.drag !== id) { r.value = vol; r.style.setProperty("--p", vol + "%"); row.querySelector(".mval").textContent = vol; }
+    row.classList.toggle("muted", mute);
+    const b = row.querySelector(".mmute"); b.setAttribute("aria-pressed", String(mute)); b.innerHTML = mute ? VOL.off : VOL.on;
+    if (sub != null) row.querySelector("small").textContent = sub;
+  };
+  if (m.master) upd("master", m.master.vol, m.master.mute, null);
+  m.apps.forEach(a => upd(a.id, a.vol, a.mute, a.active ? "joue du son" : "silencieuse"));
+}
+document.addEventListener("input", e => {
+  const r = e.target.closest && e.target.closest("[data-mvol]"); if (!r) return;
+  const id = r.dataset.mvol, v = +r.value;
+  MX.drag = id; r.style.setProperty("--p", v + "%");
+  const row = r.closest(".mrow"); row.querySelector(".mval").textContent = v;
+  // au plus un message toutes les 50 ms pendant qu'on glisse
+  MX.pend = { type: "mixer_set", id, vol: v };
+  const now = performance.now();
+  if (now - MX.sent > 50) { MX.sent = now; mixSend(MX.pend); MX.pend = null; }
+  else { clearTimeout(MX.flush); MX.flush = setTimeout(() => { if (MX.pend) { MX.sent = performance.now(); mixSend(MX.pend); MX.pend = null; } }, 60); }
+});
+document.addEventListener("change", e => {
+  const r = e.target.closest && e.target.closest("[data-mvol]"); if (!r) return;
+  clearTimeout(MX.flush); MX.pend = null;
+  mixSend({ type: "mixer_set", id: r.dataset.mvol, vol: +r.value, reply: true });
+  setTimeout(() => { MX.drag = null; }, 300);
+});
+document.addEventListener("click", e => {
+  const b = e.target.closest && e.target.closest("[data-mmute]"); if (!b) return;
+  const mute = b.getAttribute("aria-pressed") !== "true";
+  b.setAttribute("aria-pressed", String(mute)); b.innerHTML = mute ? VOL.off : VOL.on; b.closest(".mrow").classList.toggle("muted", mute);
+  mixSend({ type: "mixer_set", id: b.dataset.mmute, mute, reply: true });
+  try { navigator.vibrate && navigator.vibrate(8); } catch (x) {}
+});
+
 /* ---------------- appuis ---------------- */
 const grid = $("#grid");
 // Le raccourci part dès que le doigt touche le bouton (pas au relâchement) : on gagne le temps d'appui.
@@ -506,6 +615,7 @@ addEventListener("pointerup", e => {
   if (g.dead || !g.el) return;
   const t = findTile(g.el.dataset.tile); if (!t) return;
   if (t.kind === "media") { mediaPress(g.mk ? g.mk.dataset.mkey : "media_play_pause", g.mk || g.el); return; }
+  if (t.kind === "mixer") { openMixer(); return; }
   press(t);
 });
 addEventListener("pointercancel", e => {
@@ -649,7 +759,7 @@ grid.addEventListener("click", e => {
   if (el.classList.contains("slot")) return openEditor(null, +el.dataset.slot);
   const t = findTile(el.dataset.tile); if (!t) return;
   if (editing) return openEditor(t);
-  if (e.detail === 0) { if (t.kind === "media") { const mk = e.target.closest("[data-mkey]"); mediaPress(mk ? mk.dataset.mkey : "media_play_pause", el); } else press(t); } // clavier : pas de pointerdown
+  if (e.detail === 0) { if (t.kind === "mixer") openMixer(); else if (t.kind === "media") { const mk = e.target.closest("[data-mkey]"); mediaPress(mk ? mk.dataset.mkey : "media_play_pause", el); } else press(t); } // clavier : pas de pointerdown
 });
 async function press(t) {
   const sent = sendKeys(t.keys, t.label); // part tout de suite
@@ -674,7 +784,18 @@ function openEditor(t, slot) {
 }
 function drawEditor(confirmDel) {
   const d = draft;
-  const typeRow = d.isNew ? `<div class="chips" style="margin-bottom:14px"><button class="chip" data-tkind="button" aria-pressed="${d.kind !== "media"}">Bouton</button><button class="chip" data-tkind="media" aria-pressed="${d.kind === "media"}">${ICONS.music} Musique en cours</button></div>` : "";
+  const typeRow = d.isNew ? `<div class="chips" style="margin-bottom:14px"><button class="chip" data-tkind="button" aria-pressed="${d.kind !== "media"}">Bouton</button><button class="chip" data-tkind="media" aria-pressed="${d.kind === "media"}">${ICONS.music} Musique en cours</button><button class="chip" data-tkind="mixer" aria-pressed="${d.kind === "mixer"}">${ICONS.sliders} Mixer</button></div>` : "";
+  if (d.kind === "mixer") {
+    $("#sheetRoot").innerHTML = `<div class="scrim" data-act="scrim"><div class="sheet" role="dialog" aria-modal="true">
+      <h2>${d.isNew ? "Nouvelle case" : "Mixer"}</h2>${typeRow}
+      <div class="help">Touche la case pour ouvrir le mixer : volume général du PC et volume de chaque appli qui joue du son (Discord, Deezer, Rocket League…), avec un bouton muet chacune. Il faut Stream Deck PC à jour sur le PC.</div>
+      <label class="field" style="margin-top:14px"><span>Nom</span><input id="eLabel" maxlength="24" value="${esc(d.label || "Mixer")}"></label>
+      <h3>Couleur</h3><div class="chips">${Object.entries(COLORS).map(([k, v]) => `<button class="sw" style="--c:${v}" data-color="${k}" aria-pressed="${d.color === k}" aria-label="${k}"></button>`).join("")}</div>
+      ${confirmDel ? `<div class="confirm"><span>Supprimer la case Mixer ?</span><button class="btn" data-act="keep">Garder</button><button class="btn danger solid" data-act="del-yes">Supprimer</button></div>` : ""}
+      <div class="foot">${d.isNew ? "" : `<button class="btn danger left" data-act="del">Supprimer</button>`}<button class="btn" data-act="close">Annuler</button><button class="btn primary" data-act="save-tile">Enregistrer</button></div>
+    </div></div>`;
+    return;
+  }
   if (d.kind === "media") {
     $("#sheetRoot").innerHTML = `<div class="scrim" data-act="scrim"><div class="sheet" role="dialog" aria-modal="true">
       <h2>${d.isNew ? "Nouvelle case" : "Musique en cours"}</h2>${typeRow}
@@ -758,6 +879,7 @@ function openGuide() {
       <li>Touche le <b>crayon</b> en haut : les boutons bougent légèrement, touche-en un pour le modifier (nom, couleur, icône, touche envoyée).</li>
       <li>Pour changer de page, <b>glisse vers la gauche ou la droite</b> n'importe où sur la grille (ou touche le nom de la page en haut).</li>
       <li>Case <b>Musique en cours</b> : en modification, touche une case vide puis choisis <b>Musique en cours</b> (1, 2 ou 3 cases de large). Elle affiche ce qui joue sur le PC (Deezer, Spotify…) avec précédent / lecture / suivant.</li>
+      <li>Case <b>Mixer</b> : touche une case vide (+) en modification et choisis <b>Mixer</b>. Elle ouvre le volume général et le volume de chaque appli du PC (Discord, Deezer, jeu…), avec un bouton muet chacune.</li>
       <li>Pour <b>déplacer</b> un bouton, fais-le glisser : sur une case vide il s'y pose, sur un autre bouton ils échangent leur place, sur un onglet il part dans cette page.</li>
       <li>Touche une <b>case vide (+)</b> pour créer un bouton à cet endroit. <b>+ Page</b> crée une page.</li>
       <li><b>Bouton à état</b> : le bouton reste allumé tant que c'est actif (micro coupé, voix activée…).</li>
@@ -788,7 +910,11 @@ document.addEventListener("click", async e => {
   if (draft && $("#sheetRoot").innerHTML) {
     const c = t.closest("[data-color]"); if (c) { readDraft(); draft.color = c.dataset.color; drawEditor(); return; }
     const tk = t.closest("[data-tkind]");
-    if (tk) { readDraft(); if (tk.dataset.tkind === "media") Object.assign(draft, { kind: "media", label: "Musique", color: "music", w: 2, keys: [], toggle: false }); else { delete draft.kind; delete draft.w; Object.assign(draft, { label: "Nouveau", color: "sound", keys: ["ctrl", "shift", "f21"] }); } drawEditor(); return; }
+    if (tk) { readDraft(); const k = tk.dataset.tkind;
+      if (k === "media") Object.assign(draft, { kind: "media", label: "Musique", color: "music", w: 2, keys: [], toggle: false });
+      else if (k === "mixer") { delete draft.w; Object.assign(draft, { kind: "mixer", label: "Mixer", color: "mod", icon: "sliders", keys: [], toggle: false }); }
+      else { delete draft.kind; delete draft.w; Object.assign(draft, { label: "Nouveau", color: "sound", icon: "star", keys: ["ctrl", "shift", "f21"] }); }
+      drawEditor(); return; }
     const sz = t.closest("[data-size]"); if (sz) { draft.w = +sz.dataset.size; drawEditor(); return; }
     const ic = t.closest("[data-icon]"); if (ic) { readDraft(); draft.icon = ic.dataset.icon; drawEditor(); return; }
     const kd = t.closest("[data-kind]"); if (kd) { readDraft(); draft.keys = kd.dataset.kind === "media" ? ["media_play_pause"] : ["ctrl", "shift", "f21"]; drawEditor(); return; }
