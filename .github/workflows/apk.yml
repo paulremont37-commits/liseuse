@@ -66,7 +66,7 @@ jobs:
       - name: Fabriquer StreamDeckPC.exe
         run: |
           pip install -r agent/requirements.txt
-          pyinstaller --onefile --noconsole --name StreamDeckPC --icon agent/icon.ico --paths agent --hidden-import gui --add-data "agent/ui.html;." --add-data "agent/icon.ico;." --add-data "agent/bricolage-800.woff2;." agent/agent.py
+          pyinstaller --onefile --noconsole --name StreamDeckPC --icon agent/icon.ico --paths agent --hidden-import gui --hidden-import media --collect-submodules winrt --add-data "agent/ui.html;." --add-data "agent/icon.ico;." --add-data "agent/bricolage-800.woff2;." agent/agent.py
 
       - uses: actions/upload-artifact@v4
         with:

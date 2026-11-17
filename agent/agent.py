@@ -193,6 +193,7 @@ class State:
         self.seq = 0
         self.presses = 0
         self.loop = None
+        self.media = None           # musique en cours (media.py)
 
     def event(self, kind, text, **extra):
         with self.lock:
@@ -304,6 +305,13 @@ async def handler(ws):
         st.clients[ws] = {"ip": ip, "since": time.time()}
     st.event("on", f"Tablette connectée ({ip})")
     try:
+        import media as media_mod
+        m = media_mod.current(st)
+        if m:
+            await ws.send(json.dumps(m))
+    except Exception:
+        pass
+    try:
         async for raw in ws:
             try:
                 msg = json.loads(raw)
@@ -334,8 +342,24 @@ async def handler(ws):
     st.event("off", f"Tablette déconnectée ({ip})")
 
 
+async def broadcast(st, msg):
+    raw = json.dumps(msg)
+    with st.lock:
+        clients = list(st.clients)
+    for ws in clients:
+        try:
+            await ws.send(raw)
+        except Exception:
+            pass
+
+
 async def serve(st):
     st.loop = asyncio.get_running_loop()
+    try:  # widget « musique en cours » (Windows uniquement)
+        import media as media_mod
+        asyncio.get_running_loop().create_task(media_mod.loop(st, lambda m: broadcast(st, m)))
+    except Exception:
+        pass
     # compression=None : messages minuscules, la compression ne ferait qu'ajouter du travail
     async with websockets.serve(handler, "0.0.0.0", st.port, ping_interval=20, ping_timeout=20, max_size=4096, compression=None):
         st.listening = True

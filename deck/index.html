@@ -61,6 +61,37 @@ button{cursor:pointer}
 @keyframes flash{from{opacity:1}to{opacity:0}}
 .tile.add{border-style:dashed;background:none;--c:var(--muted)}
 .tile.ghost{visibility:hidden}
+/* widget musique */
+.tile.media{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto;align-items:center;justify-items:stretch;gap:10px 14px;padding:14px;text-align:left}
+.tile.media .mbg{position:absolute;inset:-20px;background:center/cover no-repeat;filter:blur(26px) saturate(1.4);opacity:.32;pointer-events:none}
+.tile.media > *{position:relative}
+.tile.media .mart{width:clamp(52px,7.5vw,96px);aspect-ratio:1;border-radius:14px;overflow:hidden;display:grid;place-items:center;background:color-mix(in srgb,var(--c) 10%,#000);border:1px solid color-mix(in srgb,var(--c) 40%,transparent);box-shadow:0 0 22px -8px var(--c);align-self:center}
+.tile.media .mart img{width:100%;height:100%;object-fit:cover;display:block}
+.tile.media .mart svg{width:44%;height:auto;color:var(--c);filter:drop-shadow(0 0 6px var(--c))}
+.tile.media .minfo{min-width:0;display:flex;flex-direction:column;gap:3px}
+.tile.media .mapp{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--c);text-shadow:0 0 8px color-mix(in srgb,var(--c) 70%,transparent)}
+.tile.media .mapp:empty{display:none}
+.tile.media .mt{font-family:var(--f-display);font-weight:800;font-size:clamp(15px,1.9vw,24px);line-height:1.12;letter-spacing:-.01em;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:anywhere}
+.tile.media .ma{color:var(--muted);font-weight:600;font-size:clamp(12px,1.3vw,15px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile.media .mbar{height:4px;border-radius:3px;background:rgba(255,255,255,.12);margin-top:8px;overflow:hidden}
+.tile.media .mbar i{display:block;height:100%;width:0;background:var(--c);box-shadow:0 0 10px var(--c);border-radius:3px;transition:width .5s linear}
+.tile.media .mctl{grid-column:1 / -1;display:flex;justify-content:center;gap:clamp(6px,2vw,22px)}
+.tile.media .mctl button{width:clamp(40px,4.6vw,56px);height:clamp(40px,4.6vw,56px);border-radius:50%;border:1.5px solid color-mix(in srgb,var(--c) 55%,transparent);background:#000;color:var(--fg);display:grid;place-items:center;transition:transform .08s,box-shadow .15s}
+.tile.media .mctl button svg{width:44%;height:44%}
+.tile.media .mctl .pp{border-color:var(--c);color:var(--c);box-shadow:0 0 16px -4px var(--c)}
+.tile.media .mctl button.down{transform:scale(.88);box-shadow:0 0 22px -2px var(--c)}
+.tile.media.wide{grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto;align-content:center;padding:14px 22px;column-gap:20px;row-gap:10px}
+.tile.media.wide .mart{grid-row:1 / span 2;width:clamp(64px,10vw,140px);max-height:100%}
+.tile.media.wide .mt{-webkit-line-clamp:1}
+.tile.media.wide .mctl{grid-column:2;justify-content:flex-start}
+.tile.media.wide .mctl button{width:clamp(36px,3.8vw,50px);height:clamp(36px,3.8vw,50px)}
+.tile.media{align-content:center}
+.tile.media:not(.wide) .mart{grid-row:1}
+.tile.media.idle .mt{color:var(--muted)}
+.tile.media.idle .mctl button{opacity:.45}
+.tile.media.playing .mart{box-shadow:0 0 28px -6px var(--c)}
+.hint-s{color:var(--muted);font-size:13px;margin:8px 0 0}
+.grid{will-change:transform}
 .editing .tile{touch-action:none}
 .tile.slot{border:2px dashed var(--line);background:none;box-shadow:none;--c:var(--muted);opacity:.55}
 .tile.slot svg{width:clamp(22px,22%,40px);filter:none}
@@ -278,6 +309,7 @@ const C = { ws: null, state: "off", name: "", retry: 0, timer: 0, pending: new M
 function setStatus(state, txt) {
   C.state = state; const el = $("#status"); el.className = "status " + ({ on: "on", wait: "wait", err: "err" }[state] || "");
   $("#statusTxt").textContent = txt;
+  if (typeof paintMedia === "function") try { paintMedia(); } catch (e) {}
 }
 // Temps aller-retour tablette → PC, affiché à côté du nom du PC
 function noteRtt(ms) {
@@ -298,6 +330,7 @@ function connect() {
     else if (m.type === "pong") { const t0 = C.pings.get(m.id); if (t0) { C.pings.delete(m.id); noteRtt(performance.now() - t0); } }
     else if (m.type === "error") { C.lastErr = m.reason || "refusé"; setStatus("err", "Code refusé"); if (!$("#setup").hidden) $("#setErr").textContent = "Le PC a refusé : " + C.lastErr + "."; ws.onclose = null; try { ws.close(); } catch (e) {} C.ws = null; }
     else if (m.type === "result") { const p = C.pending.get(m.id); if (p) { C.pending.delete(m.id); p(m.ok, m.reason); } }
+    else if (m.type === "media") onMedia(m);
   };
   ws.onclose = () => { C.ws = null; if (C.state === "on") toast("Connexion au PC perdue. Nouvelle tentative…"); later(); };
 }
@@ -330,7 +363,8 @@ function renderTabs() {
   $("#tabs").innerHTML = st.pages.map((p, i) => `<button class="tab" data-page="${i}" aria-current="${i === st.page}">${esc(p.name)}</button>`).join("") +
     (editing ? `<button class="tab" data-act="add-page">+ Page</button>` : "");
 }
-function tileHTML(t) {
+function tileHTML(t, wide) {
+  if (t.kind === "media") return mediaHTML(t, wide);
   const on = t.toggle && st.states[t.id];
   return `<button class="tile${on ? " on" : ""}" data-tile="${t.id}" style="--c:${COLORS[t.color] || COLORS.plain};--oc:${COLORS[t.onColor] || COLORS.clip}">
     <span class="flag">${esc(t.onLabel || "Actif")}</span>${ICONS[t.icon] || ICONS.keyboard}<span class="lbl">${esc(t.label)}</span><span class="keys">${esc(describe(t.keys))}</span></button>`;
@@ -345,12 +379,17 @@ function renderGrid() {
   g.style.gridTemplateColumns = `repeat(${cols},minmax(0,1fr))`; g.style.gridTemplateRows = `repeat(${rows},minmax(0,1fr))`;
   g.classList.toggle("editing", editing);
   const count = editing ? rows * cols : tiles.length;
-  let html = "";
+  let html = ""; const covered = new Set();
   for (let i = 0; i < count; i++) {
+    if (covered.has(i)) continue;
     const t = tiles[i];
-    html += t ? tileHTML(t) : editing ? `<button class="tile slot" data-slot="${i}" aria-label="Ajouter un bouton ici">${PLUS}</button>` : `<div class="tile ghost" aria-hidden="true"></div>`;
+    // Widget large : prend aussi la case de droite si elle est libre et sur la même ligne
+    const wide = !!(t && t.kind === "media" && t.w === 2 && i % cols < cols - 1 && !tiles[i + 1]);
+    if (wide) covered.add(i + 1);
+    html += t ? tileHTML(t, wide) : editing ? `<button class="tile slot" data-slot="${i}" aria-label="Ajouter un bouton ici">${PLUS}</button>` : `<div class="tile ghost" aria-hidden="true"></div>`;
   }
   g.innerHTML = html;
+  paintMedia();
 }
 function render() { renderTabs(); renderGrid(); $("#editBtn").setAttribute("aria-pressed", String(editing)); }
 function showDeck() { $("#setup").hidden = true; $("#grid").hidden = false; render(); }
@@ -366,15 +405,124 @@ function showSetup(msg) {
     <div class="foot"><button class="btn" data-act="guide" style="margin-right:auto">Guide</button>${st.pc ? `<button class="btn" data-act="cancel-setup">Annuler</button>` : ""}<button class="btn primary" data-act="save-pc">Connecter</button></div></div>`;
 }
 
+/* ---------------- widget « musique en cours » (ce qui joue sur le PC : Deezer, Spotify…) ---------------- */
+const M = { d: null, art: null, at: 0 };
+const NOTE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>';
+const MI = {
+  media_prev: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h2.4v14H6zM20 5.6v12.8L9.6 12z"/></svg>',
+  play: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.8v14.4L19.5 12z"/></svg>',
+  pause: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.5 5h4v14h-4zM13.5 5h4v14h-4z"/></svg>',
+  media_next: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.6 5H18v14h-2.4zM4 5.6v12.8L14.4 12z"/></svg>'
+};
+function mediaHTML(t, wide) {
+  return `<div class="tile media${wide ? " wide" : ""}" data-tile="${t.id}" role="group" aria-label="Musique en cours" style="--c:${COLORS[t.color] || COLORS.music}${wide ? ";grid-column:span 2" : ""}">
+    <div class="mbg"></div><div class="mart">${NOTE}</div>
+    <div class="minfo"><small class="mapp"></small><b class="mt"></b><span class="ma"></span><div class="mbar"><i></i></div></div>
+    <div class="mctl"><button data-mkey="media_prev" aria-label="Morceau précédent">${MI.media_prev}</button><button class="pp" data-mkey="media_play_pause" aria-label="Lecture / pause">${MI.play}</button><button data-mkey="media_next" aria-label="Morceau suivant">${MI.media_next}</button></div>
+  </div>`;
+}
+function onMedia(m) {
+  if (m.art) M.art = m.art; else if (!m.artId) M.art = null;
+  M.d = m; M.at = performance.now(); paintMedia();
+}
+function mediaPos() {
+  const d = M.d; if (!d || !d.dur) return 0;
+  return Math.min(d.dur, d.pos + (d.playing ? (performance.now() - M.at) / 1000 : 0));
+}
+function paintMedia() {
+  const els = document.querySelectorAll(".tile.media"); if (!els.length) return;
+  const d = M.d, on = !!(d && d.active && C.state === "on");
+  els.forEach(el => {
+    el.classList.toggle("idle", !on); el.classList.toggle("playing", on && d.playing);
+    el.querySelector(".mt").textContent = on ? d.title : "Rien en lecture";
+    el.querySelector(".ma").textContent = on ? d.artist : C.state === "on" ? "Lance Deezer ou Spotify sur le PC" : "PC non connecté";
+    el.querySelector(".mapp").textContent = on ? d.app || "" : "";
+    const art = el.querySelector(".mart"), bg = el.querySelector(".mbg");
+    const src = on && M.art ? M.art : "";
+    if (art.dataset.src !== src) {
+      art.dataset.src = src;
+      art.innerHTML = src ? `<img src="${src}" alt="">` : NOTE;
+      bg.style.backgroundImage = src ? `url("${src}")` : "";
+    }
+    const pp = el.querySelector(".pp"); const want = on && d.playing ? "pause" : "play";
+    if (pp.dataset.s !== want) { pp.dataset.s = want; pp.innerHTML = MI[want]; }
+    const bar = el.querySelector(".mbar"); bar.hidden = !(on && d.dur);
+    if (on && d.dur) bar.firstChild.style.width = (100 * mediaPos() / d.dur).toFixed(2) + "%";
+  });
+}
+setInterval(() => { if (M.d && M.d.playing) paintMedia(); }, 500);
+
 /* ---------------- appuis ---------------- */
 const grid = $("#grid");
 // Le raccourci part dès que le doigt touche le bouton (pas au relâchement) : on gagne le temps d'appui.
+// Hors modification : un toucher sans glisser = appui (envoyé au relâchement), un glissé horizontal = page suivante/précédente.
+let gest = null, swallowClick = false;
+document.addEventListener("pointerdown", e => {
+  if (editing || gest || $("#sheetRoot").innerHTML) return;
+  if (!e.target.closest("#grid, .bar") || !$("#setup").hidden) return;
+  if (e.pointerType === "mouse" && e.button !== 0) return;
+  const el = e.target.closest("#grid .tile[data-tile]");
+  const mk = e.target.closest("[data-mkey]");
+  gest = { pid: e.pointerId, x0: e.clientX, y0: e.clientY, t0: performance.now(), el, mk, swipe: false, dead: false };
+  if (mk) mk.classList.add("down"); else if (el) el.classList.add("down");
+}, true);
+addEventListener("pointermove", e => {
+  const g = gest; if (!g || e.pointerId !== g.pid) return;
+  const dx = e.clientX - g.x0, dy = e.clientY - g.y0;
+  if (!g.swipe && !g.dead) {
+    if (Math.abs(dx) > 22 && Math.abs(dx) > Math.abs(dy) * 1.3 && st.pages.length > 1) {
+      g.swipe = true; unpress(g); grid.style.transition = "none";
+    } else if (Math.hypot(dx, dy) > 28) { g.dead = true; unpress(g); }
+  }
+  if (g.swipe) {
+    const edge = (dx > 0 && st.page === 0) || (dx < 0 && st.page === st.pages.length - 1);
+    grid.style.transform = `translateX(${edge ? dx * 0.25 : dx}px)`;
+    grid.style.opacity = String(1 - Math.min(0.5, Math.abs(dx) / innerWidth));
+  }
+}, { passive: true });
+function unpress(g) { if (g.el) g.el.classList.remove("down"); if (g.mk) g.mk.classList.remove("down"); }
+addEventListener("pointerup", e => {
+  const g = gest; if (!g || e.pointerId !== g.pid) return;
+  gest = null; unpress(g);
+  const dx = e.clientX - g.x0, dt = performance.now() - g.t0;
+  if (g.swipe) {
+    swallowClick = true; setTimeout(() => { swallowClick = false; }, 60);
+    const dir = (Math.abs(dx) > innerWidth * 0.18 || Math.abs(dx) / dt > 0.5) ? (dx < 0 ? 1 : -1) : 0;
+    goPage(st.page + dir, dir);
+    return;
+  }
+  if (g.dead || !g.el) return;
+  const t = findTile(g.el.dataset.tile); if (!t) return;
+  if (t.kind === "media") { mediaPress(g.mk ? g.mk.dataset.mkey : "media_play_pause", g.mk || g.el); return; }
+  press(t);
+});
+addEventListener("pointercancel", e => {
+  const g = gest; if (!g || e.pointerId !== g.pid) return;
+  gest = null; unpress(g); if (g.swipe) goPage(st.page, 0);
+});
+document.addEventListener("click", e => { if (swallowClick) { swallowClick = false; e.stopPropagation(); e.preventDefault(); } }, true);
+function goPage(n, dir) {
+  const ok = n >= 0 && n < st.pages.length && n !== st.page;
+  grid.style.transition = "transform .16s ease-in, opacity .16s ease-in";
+  if (!ok) { grid.style.transform = ""; grid.style.opacity = ""; return; }
+  grid.style.transform = `translateX(${dir > 0 ? -40 : 40}%)`; grid.style.opacity = "0";
+  setTimeout(() => {
+    st.page = n; save(); render();
+    grid.style.transition = "none"; grid.style.transform = `translateX(${dir > 0 ? 30 : -30}%)`; grid.style.opacity = "0";
+    void grid.offsetWidth;
+    grid.style.transition = "transform .2s ease-out, opacity .2s ease-out"; grid.style.transform = ""; grid.style.opacity = "";
+  }, 150);
+}
+async function mediaPress(key, el) {
+  try { navigator.vibrate && navigator.vibrate(10); } catch (x) {}
+  const r = await sendKeys([key], "Musique");
+  if (!r.ok) toast(r.reason === "PC non connecté" ? "PC non connecté." : `Échec : ${r.reason}.`);
+  else if (key === "media_play_pause" && M.d) { M.d = { ...M.d, pos: mediaPos(), playing: !M.d.playing }; M.at = performance.now(); paintMedia(); }
+}
 grid.addEventListener("pointerdown", e => {
   const el = e.target.closest(".tile"); if (!el || el.classList.contains("slot") || el.classList.contains("ghost")) return;
   if (e.pointerType === "mouse" && e.button !== 0) return;
-  if (editing) { startDrag(e, el); return; }
-  el.classList.add("down");
-  const t = findTile(el.dataset.tile); if (t) press(t);
+  if (editing) startDrag(e, el);
 });
 ["pointerup", "pointercancel", "pointerleave"].forEach(ev => grid.addEventListener(ev, e => { const el = e.target.closest && e.target.closest(".tile"); if (el) el.classList.remove("down"); }, true));
 
@@ -443,7 +591,7 @@ grid.addEventListener("click", e => {
   if (el.classList.contains("slot")) return openEditor(null, +el.dataset.slot);
   const t = findTile(el.dataset.tile); if (!t) return;
   if (editing) return openEditor(t);
-  if (e.detail === 0) press(t); // clavier ou accessibilité : pas de pointerdown
+  if (e.detail === 0) { if (t.kind === "media") { const mk = e.target.closest("[data-mkey]"); mediaPress(mk ? mk.dataset.mkey : "media_play_pause", el); } else press(t); } // clavier : pas de pointerdown
 });
 async function press(t) {
   const sent = sendKeys(t.keys, t.label); // part tout de suite
@@ -467,10 +615,24 @@ function openEditor(t, slot) {
   drawEditor();
 }
 function drawEditor(confirmDel) {
-  const d = draft; const media = d.keys.length === 1 && MEDIA[d.keys[0]];
+  const d = draft;
+  const typeRow = d.isNew ? `<div class="chips" style="margin-bottom:14px"><button class="chip" data-tkind="button" aria-pressed="${d.kind !== "media"}">Bouton</button><button class="chip" data-tkind="media" aria-pressed="${d.kind === "media"}">${ICONS.music} Musique en cours</button></div>` : "";
+  if (d.kind === "media") {
+    $("#sheetRoot").innerHTML = `<div class="scrim" data-act="scrim"><div class="sheet" role="dialog" aria-modal="true">
+      <h2>${d.isNew ? "Nouvelle case" : "Musique en cours"}</h2>${typeRow}
+      <div class="help">Affiche ce qui joue sur le PC (Deezer, Spotify, YouTube…) : pochette, titre, artiste, avancement, avec précédent / lecture / suivant. Il faut Stream Deck PC à jour sur le PC.</div>
+      <h3>Taille</h3><div class="chips"><button class="chip" data-size="1" aria-pressed="${d.w !== 2}">1 case</button><button class="chip" data-size="2" aria-pressed="${d.w === 2}">2 cases (large)</button></div>
+      ${d.w === 2 ? `<p class="hint-s">En large, la case à sa droite doit rester libre.</p>` : ""}
+      <h3>Couleur</h3><div class="chips">${Object.entries(COLORS).map(([k, v]) => `<button class="sw" style="--c:${v}" data-color="${k}" aria-pressed="${d.color === k}" aria-label="${k}"></button>`).join("")}</div>
+      ${confirmDel ? `<div class="confirm"><span>Supprimer la case musique ?</span><button class="btn" data-act="keep">Garder</button><button class="btn danger solid" data-act="del-yes">Supprimer</button></div>` : ""}
+      <div class="foot">${d.isNew ? "" : `<button class="btn danger left" data-act="del">Supprimer</button>`}<button class="btn" data-act="close">Annuler</button><button class="btn primary" data-act="save-tile">Enregistrer</button></div>
+    </div></div>`;
+    return;
+  }
+  const media = d.keys.length === 1 && MEDIA[d.keys[0]];
   const mods = d.keys.filter(k => KEYNAME[k]); const main = d.keys.find(k => !KEYNAME[k]) || "f13";
   $("#sheetRoot").innerHTML = `<div class="scrim" data-act="scrim"><div class="sheet" role="dialog" aria-modal="true">
-    <h2>${d.isNew ? "Nouveau bouton" : "Modifier le bouton"}</h2>
+    <h2>${d.isNew ? "Nouveau bouton" : "Modifier le bouton"}</h2>${typeRow}
     <label class="field"><span>Nom</span><input id="eLabel" maxlength="24" value="${esc(d.label)}"></label>
     <h3>Couleur</h3><div class="chips">${Object.entries(COLORS).map(([k, v]) => `<button class="sw" style="--c:${v}" data-color="${k}" aria-pressed="${d.color === k}" aria-label="${k}"></button>`).join("")}</div>
     <h3>Icône</h3><div class="icons">${Object.entries(ICONS).map(([k, v]) => `<button data-icon="${k}" aria-pressed="${d.icon === k}" aria-label="${k}">${v}</button>`).join("")}</div>
@@ -535,6 +697,8 @@ function openGuide() {
     <details><summary>5. Brancher Medal</summary><div class="gbody">Dans Medal, ouvre les réglages des clips, clique sur la touche qui enregistre un clip, puis appuie sur <b>Clip</b>. Après un but, un appui suffit pour garder l'action.</div></details>
     <details><summary>6. Personnaliser les boutons</summary><div class="gbody"><ul>
       <li>Touche le <b>crayon</b> en haut : les boutons bougent légèrement, touche-en un pour le modifier (nom, couleur, icône, touche envoyée).</li>
+      <li>Pour changer de page, <b>glisse vers la gauche ou la droite</b> n'importe où sur la grille (ou touche le nom de la page en haut).</li>
+      <li>Case <b>Musique en cours</b> : en modification, touche une case vide puis choisis <b>Musique en cours</b>. Elle affiche ce qui joue sur le PC (Deezer, Spotify…) avec précédent / lecture / suivant.</li>
       <li>Pour <b>déplacer</b> un bouton, fais-le glisser : sur une case vide il s'y pose, sur un autre bouton ils échangent leur place, sur un onglet il part dans cette page.</li>
       <li>Touche une <b>case vide (+)</b> pour créer un bouton à cet endroit. <b>+ Page</b> crée une page.</li>
       <li><b>Bouton à état</b> : le bouton reste allumé tant que c'est actif (micro coupé, voix activée…).</li>
@@ -563,6 +727,9 @@ document.addEventListener("click", async e => {
   if (t.closest("#setBtn")) { openSettings(); return; }
   if (draft && $("#sheetRoot").innerHTML) {
     const c = t.closest("[data-color]"); if (c) { readDraft(); draft.color = c.dataset.color; drawEditor(); return; }
+    const tk = t.closest("[data-tkind]");
+    if (tk) { readDraft(); if (tk.dataset.tkind === "media") Object.assign(draft, { kind: "media", label: "Musique", color: "music", w: 2, keys: [], toggle: false }); else { delete draft.kind; delete draft.w; Object.assign(draft, { label: "Nouveau", color: "sound", keys: ["ctrl", "shift", "f21"] }); } drawEditor(); return; }
+    const sz = t.closest("[data-size]"); if (sz) { draft.w = +sz.dataset.size; drawEditor(); return; }
     const ic = t.closest("[data-icon]"); if (ic) { readDraft(); draft.icon = ic.dataset.icon; drawEditor(); return; }
     const kd = t.closest("[data-kind]"); if (kd) { readDraft(); draft.keys = kd.dataset.kind === "media" ? ["media_play_pause"] : ["ctrl", "shift", "f21"]; drawEditor(); return; }
     const md = t.closest("[data-media]"); if (md) { readDraft(); draft.keys = [md.dataset.media]; drawEditor(); return; }

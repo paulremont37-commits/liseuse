@@ -3,3 +3,7 @@ pyinstaller==6.10.0
 pywebview==5.3.2
 pystray==0.19.5
 pillow==11.0.0
+winrt-runtime==2.3.0
+winrt-Windows.Foundation==2.3.0
+winrt-Windows.Media.Control==2.3.0
+winrt-Windows.Storage.Streams==2.3.0
