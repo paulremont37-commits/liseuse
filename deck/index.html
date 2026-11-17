@@ -238,6 +238,7 @@ button{cursor:pointer}
     <div class="status" id="status"><i class="dot"></i><span id="statusTxt">Hors ligne</span></div>
     <nav class="tabs" id="tabs" aria-label="Pages"></nav>
     <div class="clock" id="clock"></div>
+    <button class="ib" id="mixBtn" aria-label="Mixer : volume de chaque appli"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg></button>
     <button class="ib" id="editBtn" aria-pressed="false" aria-label="Modifier les boutons"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/></svg></button>
     <button class="ib" id="setBtn" aria-label="Réglages"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg></button>
   </header>
@@ -879,7 +880,7 @@ function openGuide() {
       <li>Touche le <b>crayon</b> en haut : les boutons bougent légèrement, touche-en un pour le modifier (nom, couleur, icône, touche envoyée).</li>
       <li>Pour changer de page, <b>glisse vers la gauche ou la droite</b> n'importe où sur la grille (ou touche le nom de la page en haut).</li>
       <li>Case <b>Musique en cours</b> : en modification, touche une case vide puis choisis <b>Musique en cours</b> (1, 2 ou 3 cases de large). Elle affiche ce qui joue sur le PC (Deezer, Spotify…) avec précédent / lecture / suivant.</li>
-      <li>Case <b>Mixer</b> : touche une case vide (+) en modification et choisis <b>Mixer</b>. Elle ouvre le volume général et le volume de chaque appli du PC (Discord, Deezer, jeu…), avec un bouton muet chacune.</li>
+      <li><b>Mixer</b> : bouton à curseurs en haut à droite (ou une case Mixer : touche une case vide (+) en modification et choisis <b>Mixer</b>). Elle ouvre le volume général et le volume de chaque appli du PC (Discord, Deezer, jeu…), avec un bouton muet chacune.</li>
       <li>Pour <b>déplacer</b> un bouton, fais-le glisser : sur une case vide il s'y pose, sur un autre bouton ils échangent leur place, sur un onglet il part dans cette page.</li>
       <li>Touche une <b>case vide (+)</b> pour créer un bouton à cet endroit. <b>+ Page</b> crée une page.</li>
       <li><b>Bouton à état</b> : le bouton reste allumé tant que c'est actif (micro coupé, voix activée…).</li>
@@ -907,6 +908,7 @@ document.addEventListener("click", async e => {
   const nat = t.closest("[data-native]"); if (nat) { call(nat.dataset.native); return; }
   if (t.closest("#editBtn")) { editing = !editing; render(); if (editing) toast("Touche un bouton pour le modifier, fais-le glisser pour le déplacer.", 3200); return; }
   if (t.closest("#setBtn")) { openSettings(); return; }
+  if (t.closest("#mixBtn")) { openMixer(); return; }
   if (draft && $("#sheetRoot").innerHTML) {
     const c = t.closest("[data-color]"); if (c) { readDraft(); draft.color = c.dataset.color; drawEditor(); return; }
     const tk = t.closest("[data-tkind]");

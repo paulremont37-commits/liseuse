@@ -43,6 +43,19 @@ class WebStore {
         ctx = c.getApplicationContext();
         dir = new File(ctx.getFilesDir(), "web");
         prefs = ctx.getSharedPreferences("liseuse", Context.MODE_PRIVATE);
+        // Nouvelle version de l'appli installée : son interface embarquée est la plus récente,
+        // on oublie celle téléchargée avant (sinon on continuerait à afficher l'ancienne).
+        if (prefs.getInt("webForApp", -1) != BuildConfig.VERSION_CODE) {
+            prefs.edit().remove("webVersion").putInt("webForApp", BuildConfig.VERSION_CODE).apply();
+            deleteTree(dir);
+        }
+    }
+
+    private static void deleteTree(File f) {
+        File[] kids = f.listFiles();
+        if (kids != null) for (File k : kids) deleteTree(k);
+        //noinspection ResultOfMethodCallIgnored
+        f.delete();
     }
 
     String version() {
