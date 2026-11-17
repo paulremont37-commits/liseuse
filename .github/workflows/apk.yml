@@ -66,7 +66,13 @@ jobs:
       - name: Fabriquer StreamDeckPC.exe
         run: |
           pip install -r agent/requirements.txt
-          pyinstaller --onefile --noconsole --name StreamDeckPC --icon agent/icon.ico --paths agent --hidden-import gui --hidden-import media --collect-submodules winrt --add-data "agent/ui.html;." --add-data "agent/icon.ico;." --add-data "agent/bricolage-800.woff2;." agent/agent.py
+          pyinstaller --onefile --noconsole --name StreamDeckPC --icon agent/icon.ico --paths agent --hidden-import gui --hidden-import media --collect-submodules winrt --hidden-import winrt.windows.foundation --hidden-import winrt.windows.foundation.collections --hidden-import winrt.windows.storage.streams --hidden-import winrt.windows.media.control --add-data "agent/ui.html;." --add-data "agent/icon.ico;." --add-data "agent/bricolage-800.woff2;." agent/agent.py
+
+      - name: Vérifier la musique en cours avant compilation
+        shell: pwsh
+        run: |
+          python agent/agent.py --selftest
+          Get-Content selftest.txt
 
       - name: Vérifier l'exe (musique en cours et fenêtre inclus)
         shell: pwsh
@@ -76,6 +82,7 @@ jobs:
           $r = Get-Content selftest.txt | ConvertFrom-Json
           if ($r.media_import -ne "ok") { Write-Output "::error::Musique en cours absente de l'exe : $($r.media_import)"; exit 1 }
           if ($r.gui_import -ne "ok") { Write-Output "::error::Fenêtre absente de l'exe : $($r.gui_import)"; exit 1 }
+          if ($r.media_read -is [string] -and $r.media_read -match "ModuleNotFound|ImportError") { Write-Output "::error::Module manquant pour la musique : $($r.media_read)"; exit 1 }
           if ($r.media_read -is [string]) { Write-Output "::warning::Lecture de la musique sur la machine de compilation : $($r.media_read)" }
 
       - uses: actions/upload-artifact@v4
