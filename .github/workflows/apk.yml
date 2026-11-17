@@ -66,7 +66,7 @@ jobs:
       - name: Fabriquer StreamDeckPC.exe
         run: |
           pip install -r agent/requirements.txt
-          pyinstaller --onefile --console --name StreamDeckPC agent/agent.py
+          pyinstaller --onefile --console --name StreamDeckPC --icon agent/icon.ico agent/agent.py
 
       - uses: actions/upload-artifact@v4
         with:
