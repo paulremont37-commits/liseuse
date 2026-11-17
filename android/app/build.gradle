@@ -5,7 +5,8 @@ plugins {
 // Numéro de version = numéro du build GitHub (1 en local)
 def runNumber = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInteger()
 def ksPass = System.getenv("KS_PASS") ?: "liseuse-tab"
-def pages = "https://paulremont37-commits.github.io/liseuse/"
+// Mises à jour de l'interface : branche « site » publiée par .github/workflows/pages.yml
+def pages = "https://raw.githubusercontent.com/paulremont37-commits/liseuse/site/"
 
 android {
     namespace 'fr.paulremont.liseuse'

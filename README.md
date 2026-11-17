@@ -26,9 +26,9 @@ Si la question n'apparaît pas : Réglages → Applications → Choisir les appl
 
 | Dossier | Rôle |
 | --- | --- |
-| `web/` | L'interface (HTML, bibliothèques JSZip et PDF.js, polices). Publiée sur GitHub Pages à chaque modification. |
+| `web/` | L'interface (HTML, bibliothèques JSZip et PDF.js, polices). Publiée sur la branche `site` à chaque modification : les applis s'y mettent à jour toutes seules (vérification toutes les 30 min). |
 | `android/` | La coque Android : écran d'accueil plein écran qui affiche l'interface, télécharge ses mises à jour et donne accès aux réglages. |
-| `.github/workflows/` | `pages.yml` publie l'interface, `apk.yml` compile l'APK et le met dans Releases. |
+| `.github/workflows/` | `pages.yml` publie les interfaces sur la branche `site`, `apk.yml` compile l'APK et le met dans Releases. |
 
 Modifier `web/` met à jour la tablette au prochain lancement de la liseuse (ou via « Rechercher une mise à jour » dans le mode avancé). Modifier `android/` produit un nouvel APK à réinstaller.
 

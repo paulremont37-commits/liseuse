@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
-<meta name="theme-color" content="#0f1217">
+<meta name="theme-color" content="#000000">
 <title>Stream Deck</title>
 <style>
 @font-face{font-family:'Bricolage Grotesque';src:url(fonts/bricolage-grotesque-latin-800-normal.woff2) format('woff2');font-weight:800;font-display:swap}
@@ -12,9 +12,9 @@
 @font-face{font-family:'Inter';src:url(fonts/inter-latin-700-normal.woff2) format('woff2');font-weight:700;font-display:swap}
 /* Console de jeu : fond ardoise, une couleur par famille de boutons (voix, sons, clip, musique), grille qui remplit l'écran */
 :root{
-  --bg:#0f1217; --panel:#171b22; --panel-2:#20262f; --line:#2c333e; --fg:#eef1f6; --muted:#8e97a6;
-  --voice:#8c9bff; --mod:#4fdc9b; --sound:#ffb23f; --clip:#ff5d6c; --music:#3fd4e0; --plain:#b9c0cc; --pink:#ff7bc8; --lime:#c4f25a;
-  --ok:#4fdc9b; --bad:#ff5d6c;
+  --bg:#000; --panel:#08080c; --panel-2:#111118; --line:#1e1e2a; --fg:#f4f6ff; --muted:#7d8094;
+  --voice:#8a6bff; --mod:#00ffa3; --sound:#ffc21a; --clip:#ff2d6b; --music:#00e5ff; --plain:#c8cede; --pink:#ff3ccf; --lime:#b8ff2e;
+  --ok:#00ffa3; --bad:#ff2d6b;
   --f-display:'Bricolage Grotesque','Inter',system-ui,sans-serif;
   --f-ui:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
   color-scheme:dark;
@@ -123,6 +123,40 @@ button{cursor:pointer}
 .confirm span{flex:1 1 200px;font-weight:600}
 .toasts{position:fixed;z-index:30;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;width:min(520px,calc(100% - 32px))}
 .toast{background:#262d38;border-radius:14px;padding:12px 16px;font-weight:600;box-shadow:0 10px 30px rgba(0,0,0,.4);text-align:center}
+/* ---------------- DA néon : fond noir, chaque bouton est un tube lumineux de sa couleur ---------------- */
+.status{background:#000;border-color:var(--line)}
+.status.on{border-color:color-mix(in srgb,var(--ok) 55%,transparent);box-shadow:0 0 16px -6px var(--ok)}
+.status.on .dot{box-shadow:0 0 10px var(--ok),0 0 0 4px color-mix(in srgb,var(--ok) 18%,transparent)}
+.status.err .dot{box-shadow:0 0 10px var(--bad)}
+.tab{color:var(--muted);letter-spacing:.02em;position:relative}
+.tab[aria-current="true"]{background:none;color:var(--fg);text-shadow:0 0 12px rgba(255,255,255,.55)}
+.tab[aria-current="true"]::after{content:"";position:absolute;left:18px;right:18px;bottom:6px;height:3px;border-radius:3px;background:var(--music);box-shadow:0 0 10px var(--music),0 0 20px var(--music)}
+.clock{color:var(--music);text-shadow:0 0 14px color-mix(in srgb,var(--music) 70%,transparent)}
+.ib{background:#000;border-color:var(--line)}
+.ib[aria-pressed="true"]{background:#000;color:var(--sound);border-color:var(--sound);box-shadow:0 0 14px -2px var(--sound),inset 0 0 12px -4px var(--sound)}
+.tile{background:#000;border:2px solid color-mix(in srgb,var(--c) 65%,transparent);
+  box-shadow:0 0 22px -8px var(--c),inset 0 0 26px -14px var(--c);transition:transform .08s ease,box-shadow .15s,border-color .15s,background .15s}
+.tile svg{filter:drop-shadow(0 0 6px color-mix(in srgb,var(--c) 80%,transparent))}
+.tile .lbl{color:var(--fg);text-shadow:0 0 10px color-mix(in srgb,var(--c) 45%,transparent)}
+.tile.down{transform:scale(.95);border-color:var(--c);box-shadow:0 0 34px -4px var(--c),inset 0 0 40px -10px var(--c)}
+.tile.on{background:color-mix(in srgb,var(--oc) 12%,#000);border-color:var(--oc);box-shadow:0 0 30px -4px var(--oc),0 0 70px -24px var(--oc),inset 0 0 36px -10px var(--oc)}
+.tile.on svg{filter:drop-shadow(0 0 10px var(--oc))}
+.tile .flag{background:#000;color:var(--oc);border:1.5px solid var(--oc);box-shadow:0 0 10px -2px var(--oc);text-shadow:0 0 8px var(--oc)}
+.tile.ok::after{box-shadow:inset 0 0 0 3px var(--ok),inset 0 0 30px -6px var(--ok)}
+.tile.fail::after{box-shadow:inset 0 0 0 3px var(--bad),inset 0 0 30px -6px var(--bad)}
+.tile.add{box-shadow:none;border-color:var(--line)}
+.tile.add svg{filter:none}
+.card,.sheet{background:#05050a;border-color:var(--line);box-shadow:0 0 0 1px rgba(255,255,255,.02),0 30px 80px -20px rgba(0,0,0,.9)}
+.sheet{border-top:2px solid var(--music);box-shadow:0 -6px 30px -14px var(--music),0 30px 80px -20px #000}
+.scrim{background:rgba(0,0,0,.78)}
+.btn,.chip,.field input,.field select,.icons button,.preview,.help{background:#0b0b11}
+.btn.primary{background:var(--sound);color:#140e00;box-shadow:0 0 18px -4px var(--sound)}
+.chip[aria-pressed="true"],.icons button[aria-pressed="true"]{background:#000;color:var(--music);border-color:var(--music);box-shadow:0 0 12px -3px var(--music),inset 0 0 10px -5px var(--music)}
+.sw{box-shadow:0 0 12px -3px var(--c)}
+.sw[aria-pressed="true"]{border-color:#fff;box-shadow:0 0 0 3px #000 inset,0 0 16px var(--c)}
+.switch[aria-checked="true"]::after{box-shadow:0 0 10px var(--sound)}
+.toast{background:#0b0b11;border:1px solid var(--line);box-shadow:0 0 24px -10px var(--music),0 10px 30px rgba(0,0,0,.6)}
+:focus-visible{outline-color:var(--music)}
 @media (max-width:640px){.clock{display:none}.status{max-width:none}.grid{gap:10px}.tile{border-radius:18px}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
@@ -469,7 +503,7 @@ document.addEventListener("click", async e => {
   else if (act === "keep") drawEditor();
   else if (act === "del-yes") { for (const p of st.pages) p.tiles = p.tiles.filter(x => x.id !== draft.id); delete st.states[draft.id]; save(); $("#sheetRoot").innerHTML = ""; draft = null; renderGrid(); toast("Bouton supprimé."); }
   else if (act === "add-page") { st.pages.push({ id: uid(), name: "Page " + (st.pages.length + 1), tiles: [] }); st.page = st.pages.length - 1; save(); render(); }
-  else if (act === "rename-page") { $("#sheetRoot").innerHTML = `<div class="scrim" data-act="scrim"><div class="sheet"><h2>Renommer la page</h2><label class="field"><span>Nom</span><input id="pName" maxlength="20" value="${esc(st.pages[st.page].name)}"></label><div class="foot"><button class="btn" data-act="close">Annuler</button><button class="btn primary" data-act="save-page">Enregistrer</button></div></div></div>`; $("#pName").focus(); }
+  else if (act === "rename-page") { $("#sheetRoot").innerHTML = `<div class="scrim" data-act="scrim"><div class="sheet"><h2>Renommer la page</h2><label class="field"><span>Nom</span><input id="pName" maxlength="20" value="${esc(st.pages[st.page].name)}"></label><div class="foot"><button class="btn" data-act="close">Annuler</button><button class="btn primary" data-act="save-page">Enregistrer</button></div></div></div>` }
   else if (act === "save-page") { const v = $("#pName").value.trim(); if (v) st.pages[st.page].name = v; save(); $("#sheetRoot").innerHTML = ""; render(); }
   else if (act === "del-page") { if (st.pages.length > 1) { st.pages.splice(st.page, 1); st.page = 0; save(); $("#sheetRoot").innerHTML = ""; render(); toast("Page supprimée."); } }
   else if (act === "reset-states") { st.states = {}; save(); renderGrid(); toast("Tous les boutons sont éteints."); }
@@ -491,7 +525,16 @@ document.addEventListener("click", async e => {
 document.addEventListener("keydown", e => { if (e.key === "Enter" && e.target.id === "pcCode") document.querySelector('[data-act="save-pc"]').click(); });
 window.liseuseBack = () => { if ($("#sheetRoot").innerHTML) { $("#sheetRoot").innerHTML = ""; draft = null; return true; } if (editing) { editing = false; render(); return true; } return true; };
 window.liseuseHome = () => { $("#sheetRoot").innerHTML = ""; draft = null; editing = false; if (st.pc) showDeck(); };
-window.liseuseUpdateReady = () => toast("Nouvelle version téléchargée. Elle s'applique au prochain démarrage.", 4000);
+// Mise à jour automatique : dès que la nouvelle interface est téléchargée, on l'applique
+// au premier moment calme (aucune fenêtre ouverte, pas en modification, 20 s sans appui).
+let lastTouch = Date.now(), updatePending = false;
+addEventListener("pointerdown", () => { lastTouch = Date.now(); }, true);
+function applyUpdateWhenIdle() {
+  if (!updatePending) return;
+  if (editing || $("#sheetRoot").innerHTML || !$("#setup").hidden || Date.now() - lastTouch < 20000) return void setTimeout(applyUpdateWhenIdle, 5000);
+  call("reload");
+}
+window.liseuseUpdateReady = () => { updatePending = true; toast("Mise à jour téléchargée, elle s'installe toute seule.", 3000); setTimeout(applyUpdateWhenIdle, 5000); };
 let rz = 0; addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(renderGrid, 100); });
 
 function tick() { $("#clock").textContent = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }); }

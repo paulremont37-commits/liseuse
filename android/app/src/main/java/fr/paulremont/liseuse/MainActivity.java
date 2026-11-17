@@ -56,7 +56,7 @@ public class MainActivity extends Activity {
     static final String HOST = "appassets.androidplatform.net";
     static final String START = "https://" + HOST + "/index.html";
     private static final int PICK_FILES = 42;
-    private static final long CHECK_EVERY_MS = 6L * 60 * 60 * 1000;
+    private static final long CHECK_EVERY_MS = 30L * 60 * 1000;
 
     private WebView web;
     private WebStore store;
@@ -151,7 +151,16 @@ public class MainActivity extends Activity {
             handler.postDelayed(watchdog, 12000);
         }
         checkForUpdate();
+        handler.postDelayed(periodicCheck, CHECK_EVERY_MS);
     }
+
+    /** Mises à jour automatiques même si l'appli reste ouverte des jours (écran d'accueil, Stream Deck). */
+    private final Runnable periodicCheck = new Runnable() {
+        @Override public void run() {
+            if (System.currentTimeMillis() - lastCheck >= CHECK_EVERY_MS - 1000) checkForUpdate();
+            handler.postDelayed(this, CHECK_EVERY_MS);
+        }
+    };
 
     /* ---------- écran de secours (si l'interface ne s'affiche pas) ---------- */
 
