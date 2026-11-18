@@ -630,7 +630,12 @@ addEventListener("pointerup", e => {
   if (g.dead || !g.el) return;
   const t = findTile(g.el.dataset.tile); if (!t) return;
   if (t.kind === "media") { mediaPress(g.mk ? g.mk.dataset.mkey : "media_play_pause", g.mk || g.el); return; }
-  if (t.kind === "mixer") { openMixer(); return; }
+  if (t.kind === "mixer") {
+    // Au doigt, Android envoie un « clic » juste après le relâchement : il tomberait sur le fond du panneau
+    // qui vient de s'ouvrir et le refermerait aussitôt. On l'ignore.
+    swallowClick = true; setTimeout(() => { swallowClick = false; }, 500);
+    openMixer(); return;
+  }
   press(t);
 });
 addEventListener("pointercancel", e => {
