@@ -265,6 +265,16 @@ body.asleep *,body.asleep *::before,body.asleep *::after{animation:none!importan
 .tile.on img.tico{filter:drop-shadow(0 0 10px var(--oc))}
 .icons button img{width:28px;height:28px;object-fit:contain;pointer-events:none}
 .icons button.cur{border-color:var(--music)}
+.icons button.cur.photo{padding:0;overflow:hidden}.icons button.cur.photo img{width:100%;height:100%;object-fit:cover}
+.photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;max-height:300px;overflow:auto;scrollbar-width:thin}
+.photos button{aspect-ratio:1;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:#0b0b11;padding:0}
+.photos img{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}
+.ltabs .chip{height:38px}
+.tile.photo{justify-content:flex-end;padding:0;overflow:hidden}
+.tile.photo .tphoto{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:22px;pointer-events:none}
+.tile.photo::before{content:"";position:absolute;inset:0;border-radius:22px;background:linear-gradient(180deg,transparent 45%,rgba(0,0,0,.85));pointer-events:none}
+.tile.photo .lbl{position:relative;margin:0 10px 12px;text-shadow:0 1px 6px #000}
+.tile.photo.on{box-shadow:0 0 30px -4px var(--oc),inset 0 0 0 3px var(--oc)}
 .logos{margin-top:12px;display:flex;flex-direction:column;gap:10px}
 .lsearch{display:flex;gap:8px}
 .lsearch input{flex:1;min-width:0;height:44px;border-radius:12px;border:1px solid var(--line);background:#0b0b11;color:var(--fg);padding:0 14px;font:inherit}
@@ -469,6 +479,8 @@ function tileHTML(t, span) {
   if (t.kind === "rl") return rlHTML(t, span || 1);
   if (t.kind === "mixer") return `<button class="tile mixertile" data-tile="${t.id}" style="--c:${COLORS[t.color] || COLORS.mod}">${ICONS.sliders}<span class="lbl">${esc(t.label || "Mixer")}</span><span class="keys">Volume par appli</span></button>`;
   const on = t.toggle && st.states[t.id];
+  if (t.img) return `<button class="tile photo${on ? " on" : ""}" data-tile="${t.id}" style="--c:${COLORS[t.color] || COLORS.plain};--oc:${COLORS[t.onColor] || COLORS.clip}">
+    <img class="tphoto" src="${t.img}" alt=""><span class="flag">${esc(t.onLabel || "Actif")}</span><span class="lbl">${esc(t.label)}</span><span class="keys">${esc(describe(t.keys))}</span></button>`;
   return `<button class="tile${on ? " on" : ""}" data-tile="${t.id}" style="--c:${COLORS[t.color] || COLORS.plain};--oc:${COLORS[t.onColor] || COLORS.clip}">
     <span class="flag">${esc(t.onLabel || "Actif")}</span>${t.svg ? `<img class="tico" src="${logoSrc(t.svg, COLORS[t.color] || COLORS.plain)}" alt="">` : ICONS[t.icon] || ICONS.keyboard}<span class="lbl">${esc(t.label)}</span><span class="keys">${esc(describe(t.keys))}</span></button>`;
 }
@@ -945,11 +957,15 @@ function drawEditor(confirmDel) {
     <h2>${d.isNew ? "Nouveau bouton" : "Modifier le bouton"}</h2>${typeRow}
     <label class="field"><span>Nom</span><input id="eLabel" maxlength="24" value="${esc(d.label)}"></label>
     <h3>Couleur</h3><div class="chips">${Object.entries(COLORS).map(([k, v]) => `<button class="sw" style="--c:${v}" data-color="${k}" aria-pressed="${d.color === k}" aria-label="${k}"></button>`).join("")}</div>
-    <h3>Icône</h3><div class="icons">${d.svg ? `<button class="cur" aria-pressed="true" aria-label="Logo choisi"><img src="${logoSrc(d.svg, COLORS[d.color] || COLORS.plain)}" alt=""></button>` : ""}${Object.entries(ICONS).map(([k, v]) => `<button data-icon="${k}" aria-pressed="${!d.svg && d.icon === k}" aria-label="${k}">${v}</button>`).join("")}</div>
+    <h3>Icône</h3><div class="icons">${d.img ? `<button class="cur photo" aria-pressed="true" aria-label="Image choisie"><img src="${d.img}" alt=""></button>` : ""}${d.svg ? `<button class="cur" aria-pressed="true" aria-label="Logo choisi"><img src="${logoSrc(d.svg, COLORS[d.color] || COLORS.plain)}" alt=""></button>` : ""}${Object.entries(ICONS).map(([k, v]) => `<button data-icon="${k}" aria-pressed="${!d.svg && !d.img && d.icon === k}" aria-label="${k}">${v}</button>`).join("")}</div>
     <div class="logos">
-      <form class="lsearch" id="logoForm"><input id="logoQ" type="search" enterkeyhint="search" placeholder="Logos en ligne : Discord, Spotify, Twitch…" value="${esc(LG.q)}" autocomplete="off" aria-label="Chercher un logo"><button class="chip" type="submit">Chercher</button></form>
-      <div class="chips lquick">${LOGO_QUICK.map(q => `<button class="chip" data-logoq="${esc(q)}">${esc(q)}</button>`).join("")}</div>
-      <div class="lres" id="logoRes">${logoResHTML()}</div>
+      <div class="chips ltabs">${[["logos", "Logos"], ["images", "Images en ligne"], ["link", "Lien d'image"]].map(([k, l]) => `<button class="chip" data-lmode="${k}" aria-pressed="${LG.mode === k}">${l}</button>`).join("")}</div>
+      ${LG.mode === "link" ? `<form class="lsearch" id="linkForm"><input id="linkQ" type="url" inputmode="url" placeholder="Colle l'adresse d'une image (https://…)" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Adresse de l'image"><button class="chip" type="submit">Utiliser</button></form>
+        <p class="hint-s">Dans le navigateur : appui long sur une image → « Copier l'adresse de l'image », puis colle-la ici.</p>` : `
+      <form class="lsearch" id="logoForm"><input id="logoQ" type="search" enterkeyhint="search" placeholder="${LG.mode === "images" ? "Images en ligne : un nom, un objet, un lieu…" : "Logos en ligne : Discord, Spotify, Twitch…"}" value="${esc(LG.mode === "images" ? IM.q : LG.q)}" autocomplete="off" aria-label="Chercher"><button class="chip" type="submit">Chercher</button></form>
+      ${LG.mode === "logos" ? `<div class="chips lquick">${LOGO_QUICK.map(q => `<button class="chip" data-logoq="${esc(q)}">${esc(q)}</button>`).join("")}</div>` : ""}
+      <div class="lres" id="logoRes">${LG.mode === "images" ? imgResHTML() : logoResHTML()}</div>`}
+      ${d.img && d.imgCredit ? `<p class="hint-s">Image : ${esc(d.imgCredit)}</p>` : ""}
     </div>
     <h3>Action</h3><div class="chips"><button class="chip" data-kind="hotkey" aria-pressed="${!media}">Raccourci clavier</button><button class="chip" data-kind="media" aria-pressed="${!!media}">Musique et volume</button></div>
     ${media ? `<div class="chips" style="margin-top:10px">${Object.entries(MEDIA).map(([k, v]) => `<button class="chip" data-media="${k}" aria-pressed="${d.keys[0] === k}">${v}</button>`).join("")}</div>`
@@ -965,7 +981,53 @@ function drawEditor(confirmDel) {
 }
 /* ---- logos en ligne (bibliothèque Iconify : logos de marques et icônes libres) ----
    Le logo choisi est copié dans le bouton : il reste affiché sans connexion. */
-const LG = { q: "", res: null, busy: false, err: "" };
+const LG = { q: "", res: null, busy: false, err: "", mode: "logos" };
+const IM = { q: "", res: null, busy: false, err: "" };
+// Téléchargement d'une image : dans l'appli Android, on passe par la coque (pas de blocage entre sites)
+const netImg = url => fetch(AND ? "/__net?" + new URLSearchParams({ u: url }) : url);
+function imgResHTML() {
+  if (IM.busy) return `<p class="hint-s">Recherche…</p>`;
+  if (IM.err) return `<p class="hint-s">${esc(IM.err)}</p>`;
+  if (!IM.res) return `<p class="hint-s">Images libres de Wikimedia Commons et Openverse. L'image choisie est recadrée et copiée dans le bouton, rien n'est enregistré sur la tablette.</p>`;
+  if (!IM.res.length) return `<p class="hint-s">Aucune image trouvée pour « ${esc(IM.q)} ».</p>`;
+  return `<div class="photos">${IM.res.map((r, i) => `<button data-photo="${i}" title="${esc(r.title)}"><img loading="lazy" src="${esc(r.thumb)}" alt="${esc(r.title)}"></button>`).join("")}</div>`;
+}
+async function searchImages(q) {
+  q = q.trim(); if (!q) return;
+  IM.q = q; IM.busy = true; IM.err = ""; paintLogos();
+  const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 12000);
+  const commons = fetch("https://commons.wikimedia.org/w/api.php?" + new URLSearchParams({
+      action: "query", generator: "search", gsrsearch: "filetype:bitmap " + q, gsrnamespace: "6", gsrlimit: "40",
+      prop: "imageinfo", iiprop: "url|extmetadata", iiurlwidth: "320", format: "json", origin: "*" }), { signal: ctl.signal })
+    .then(r => r.json()).then(j => Object.values((j.query && j.query.pages) || {}).sort((a, b) => (a.index || 0) - (b.index || 0)).map(p => {
+      const ii = (p.imageinfo || [])[0] || {}, md = ii.extmetadata || {};
+      const strip = h => String(h || "").replace(/<[^>]+>/g, "").trim();
+      return { thumb: ii.thumburl || ii.url, title: p.title.replace(/^File:|^Fichier:/, "").replace(/\.\w+$/, ""),
+        credit: [strip(md.Artist && md.Artist.value), strip(md.LicenseShortName && md.LicenseShortName.value), "Wikimedia Commons"].filter(Boolean).join(" · ") };
+    }).filter(x => x.thumb)).catch(() => []);
+  const openverse = fetch("https://api.openverse.org/v1/images/?" + new URLSearchParams({ q, page_size: "30" }), { signal: ctl.signal })
+    .then(r => r.json()).then(j => (j.results || []).map(x => ({ thumb: x.thumbnail || x.url, title: x.title || q,
+      credit: [x.creator, x.license ? "CC " + String(x.license).toUpperCase() : "", "Openverse"].filter(Boolean).join(" · ") })).filter(x => x.thumb)).catch(() => []);
+  const [a, b] = await Promise.all([commons, openverse]); clearTimeout(tm);
+  IM.res = [...a, ...b].slice(0, 60);
+  if (!IM.res.length && ctl.signal.aborted) { IM.res = null; IM.err = "Pas de connexion aux banques d'images (Wi-Fi ?)."; }
+  IM.busy = false; paintLogos();
+}
+/** Recadre une image en carré 256 px et la garde dans le bouton (JPEG ~20 Ko). */
+async function useImage(url, credit) {
+  try {
+    const r = await netImg(url);
+    if (!r.ok) throw new Error();
+    const blob = await r.blob();
+    if (!/^image\//.test(blob.type || "image/")) throw new Error();
+    const bmp = await createImageBitmap(blob);
+    const side = Math.min(bmp.width, bmp.height), S = 256;
+    const c = document.createElement("canvas"); c.width = c.height = S;
+    c.getContext("2d").drawImage(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side, 0, 0, S, S);
+    const data = c.toDataURL("image/jpeg", 0.85);
+    readDraft(); draft.img = data; draft.imgCredit = credit || ""; delete draft.svg; drawEditor();
+  } catch (e) { toast("Impossible d'utiliser cette image (lien privé ou pas une image)."); }
+}
 const LOGO_QUICK = ["Discord", "Spotify", "Deezer", "Twitch", "YouTube", "OBS", "Steam", "Epic Games", "Rocket League", "Voicemod", "Medal", "Chrome"];
 const ICONIFY = "https://api.iconify.design";
 function logoSrc(svg, color) {
@@ -996,14 +1058,14 @@ async function searchLogos(q) {
   } catch (e) { LG.res = null; LG.err = "Pas de connexion à la bibliothèque de logos (Wi-Fi ?)."; }
   LG.busy = false; paintLogos();
 }
-function paintLogos() { const r = $("#logoRes"); if (r) r.innerHTML = logoResHTML(); }
+function paintLogos() { const r = $("#logoRes"); if (r) r.innerHTML = LG.mode === "images" ? imgResHTML() : logoResHTML(); }
 async function pickLogo(name) {
   const [p, i] = name.split(":");
   try {
     const r = await fetch(`${ICONIFY}/${encodeURIComponent(p)}/${encodeURIComponent(i)}.svg`);
     const svg = (await r.text()).trim();
     if (!r.ok || !/^<svg[\s>]/i.test(svg) || svg.length > 40000 || /<script|on\w+=/i.test(svg)) throw new Error("logo invalide");
-    readDraft(); draft.svg = svg; draft.icon = "logo"; drawEditor();
+    readDraft(); draft.svg = svg; draft.icon = "logo"; delete draft.img; delete draft.imgCredit; drawEditor();
     const s = $("#sheetRoot .sheet"); const h = s && s.querySelector(".icons"); if (h) h.scrollIntoView({ block: "center" });
   } catch (e) { toast("Impossible de récupérer ce logo."); }
 }
@@ -1014,7 +1076,10 @@ function readDraft() {
   const k = $("#eKey"); if (k) { const mods = draft.keys.filter(x => KEYNAME[x]); draft.keys = [...mods, k.value]; }
 }
 function pageTiles() { return st.pages[st.page].tiles; }
-document.addEventListener("submit", e => { if (e.target.id === "logoForm") { e.preventDefault(); searchLogos($("#logoQ").value); } });
+document.addEventListener("submit", e => {
+  if (e.target.id === "logoForm") { e.preventDefault(); (LG.mode === "images" ? searchImages : searchLogos)($("#logoQ").value); }
+  if (e.target.id === "linkForm") { e.preventDefault(); const u = $("#linkQ").value.trim(); if (/^https?:\/\//i.test(u)) useImage(u, ""); else toast("Colle une adresse qui commence par https://"); }
+});
 
 /* ---------------- réglages ---------------- */
 function openSettings(confirmReset) {
@@ -1063,6 +1128,7 @@ function openGuide() {
       <li>Pour changer de page, <b>glisse vers la gauche ou la droite</b> n'importe où sur la grille (ou touche le nom de la page en haut).</li>
       <li>Case <b>Musique en cours</b> : en modification, touche une case vide puis choisis <b>Musique en cours</b> (1, 2 ou 3 cases de large). Elle affiche ce qui joue sur le PC (Deezer, Spotify…) avec précédent / lecture / suivant.</li>
       <li><b>Batterie</b> : affichée en haut à droite. Sans toucher la tablette (1 min par défaut, réglable dans Réglages → Veille de l'écran), l'écran passe au minimum avec l'heure ; un toucher le rallume sans appuyer sur un bouton.</li>
+      <li><b>Images</b> : dans la fiche d'un bouton, onglet <b>Images en ligne</b> (banques d'images libres) ou <b>Lien d'image</b> (colle l'adresse d'une image trouvée n'importe où). L'image est recadrée et copiée dans le bouton, rien n'est enregistré sur la tablette.</li>
       <li><b>Logos</b> : dans la fiche d'un bouton, cherche un logo en ligne (Discord, Spotify, Twitch…) sous les icônes. Il est copié dans le bouton : il reste affiché sans connexion. Les logos d'une couleur prennent la couleur du bouton.</li>
       <li><b>Rocket League</b> : touche une case vide (+) en modification et choisis <b>Rocket League</b> (1 à 3 cases). Elle montre ta session (victoires, défaites, série) ; touche-la pour le détail. La session s'affiche aussi sur l'écran de veille. À activer une fois dans Stream Deck PC (carte Rocket League).</li>
       <li><b>Mixer</b> : bouton à curseurs en haut à droite (ou une case Mixer : touche une case vide (+) en modification et choisis <b>Mixer</b>). Elle ouvre le volume général et le volume de chaque appli du PC (Discord, Deezer, jeu…), avec un bouton muet chacune.</li>
@@ -1104,7 +1170,9 @@ document.addEventListener("click", async e => {
       else { delete draft.kind; delete draft.w; Object.assign(draft, { label: "Nouveau", color: "sound", icon: "star", keys: ["ctrl", "shift", "f21"] }); }
       drawEditor(); return; }
     const sz = t.closest("[data-size]"); if (sz) { draft.w = +sz.dataset.size; drawEditor(); return; }
-    const ic = t.closest("[data-icon]"); if (ic) { readDraft(); draft.icon = ic.dataset.icon; delete draft.svg; drawEditor(); return; }
+    const ic = t.closest("[data-icon]"); if (ic) { readDraft(); draft.icon = ic.dataset.icon; delete draft.svg; delete draft.img; delete draft.imgCredit; drawEditor(); return; }
+    const lm = t.closest("[data-lmode]"); if (lm) { readDraft(); LG.mode = lm.dataset.lmode; drawEditor(); return; }
+    const ph = t.closest("[data-photo]"); if (ph) { const r = IM.res && IM.res[+ph.dataset.photo]; if (r) { ph.disabled = true; useImage(r.thumb, r.credit); } return; }
     const lg = t.closest("[data-logo]"); if (lg) { pickLogo(lg.dataset.logo); return; }
     const lq = t.closest("[data-logoq]"); if (lq) { const inp = $("#logoQ"); if (inp) inp.value = lq.dataset.logoq; searchLogos(lq.dataset.logoq); return; }
     const kd = t.closest("[data-kind]"); if (kd) { readDraft(); draft.keys = kd.dataset.kind === "media" ? ["media_play_pause"] : ["ctrl", "shift", "f21"]; drawEditor(); return; }
