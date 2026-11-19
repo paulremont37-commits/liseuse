@@ -86,6 +86,24 @@ main{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1.05fr) min
 .music.bad{color:var(--red);border-color:color-mix(in srgb,var(--red) 40%,transparent)}.music.bad svg{color:var(--red);filter:none}
 .music span{user-select:text;-webkit-user-select:text}
 
+.leftcol{display:flex;flex-direction:column;gap:16px;min-height:0;overflow:auto;scrollbar-width:none}
+.leftcol .pair{flex:1 0 auto;gap:12px;padding-block:18px}
+.leftcol .ip{font-size:clamp(28px,4.4vw,48px)}
+.leftcol .code{font-size:clamp(38px,6.2vw,70px)}
+.rlcard{gap:10px;flex:none;padding-block:16px}
+.rlrow{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.rlwl{font-family:var(--f-display);font-weight:800;font-size:30px;letter-spacing:.01em}
+.rlwl .w{color:var(--green);text-shadow:0 0 14px color-mix(in srgb,var(--green) 60%,transparent)}
+.rlwl .l{color:var(--red);text-shadow:0 0 14px color-mix(in srgb,var(--red) 60%,transparent)}
+.rlwl .sep{color:var(--muted);margin:0 8px}
+.chipx{font-size:12.5px;font-weight:700;border-radius:8px;padding:3px 9px;border:1px solid var(--line);color:var(--muted)}
+.chipx.up{color:var(--green);border-color:color-mix(in srgb,var(--green) 45%,transparent)}
+.chipx.down{color:var(--red);border-color:color-mix(in srgb,var(--red) 45%,transparent)}
+.rlnote{color:var(--muted);margin:0;line-height:1.45}
+.rlme{color:var(--muted)}.rlme b{color:var(--fg)}
+.rlme input{height:34px;border-radius:10px;border:1px solid var(--line);background:var(--panel-2);color:var(--fg);padding:0 10px;font:inherit;width:170px;user-select:text;-webkit-user-select:text}
+.btn.sm{height:34px;padding:0 12px;font-size:13px}
+
 /* pied */
 footer{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
 .sw{display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:600;background:none;border:0;padding:0}
@@ -119,6 +137,7 @@ footer .right{display:flex;gap:8px;margin-left:auto}
   </div>
 
   <main>
+    <div class="leftcol">
     <section class="card pair" id="pair">
       <h2>Sur la tablette, entre</h2>
       <div class="field"><label>Adresse du PC</label><div class="big ip" id="ip">…</div></div>
@@ -126,6 +145,11 @@ footer .right{display:flex;gap:8px;margin-left:auto}
       <p class="hint" id="hint">La tablette et le PC doivent être sur la même box (Wi-Fi ou câble).</p>
       <div id="codeZone" class="row"><button class="btn" data-act="new-code">Nouveau code</button></div>
     </section>
+    <section class="card rlcard" id="rl">
+      <h2>Rocket League <span class="n" id="rlState"></span></h2>
+      <div id="rlBody"></div>
+    </section>
+    </div>
 
     <section class="card feedcard">
       <h2>Activité <span class="n" id="count"></span></h2>
@@ -189,10 +213,28 @@ footer .right{display:flex;gap:8px;margin-left:auto}
     }
     $("#empty").hidden = $("#feed").children.length > 0;
     $("#feed").hidden = !$("#empty").hidden;
+    drawRl(s.rl);
     const mu = $("#music"); mu.hidden = !s.music;
     if (s.music) { $("#musicTxt").textContent = s.music; mu.className = "music" + (/^(Erreur|Indisponible)/.test(s.music) ? " bad" : /^(Rien|Recherche)/.test(s.music) ? " idle" : ""); mu.title = s.music; }
     $("#count").textContent = s.presses ? `${s.presses} appui${s.presses > 1 ? "s" : ""}` : "";
     seq = s.seq; first = false;
+  }
+
+  let rlEditing = false;
+  function drawRl(r) {
+    const st = $("#rlState"), b = $("#rlBody");
+    if (!r) { st.textContent = ""; b.innerHTML = `<p class="rlnote">Démarrage…</p>`; return; }
+    st.textContent = r.connected ? "jeu connecté" : r.status === "on" ? "en attente du jeu" : "";
+    st.style.color = r.connected ? "var(--green)" : "";
+    if (rlEditing) return;
+    let h = "";
+    if (r.status === "nogame") h += `<p class="rlnote">Rocket League introuvable sur ce PC (installation Epic Games).</p>`;
+    else if (r.status === "off") h += `<div class="rlrow"><p class="rlnote" style="flex:1 1 220px">Les stats ne sont pas activées dans le jeu. Le bouton écrit le réglage dans le dossier de Rocket League (Windows peut demander l'autorisation).</p><button class="btn primary" data-act="rl-enable">Activer</button></div>`;
+    else if (!r.connected) h += `<p class="rlnote">Stats activées. Lance (ou relance) Rocket League : la session se suit toute seule, en ligne seulement.</p>`;
+    const sk = r.streak > 0 ? `<span class="chipx up">Série ${r.streak} V</span>` : r.streak < 0 ? `<span class="chipx down">Série ${-r.streak} D</span>` : "";
+    if (r.n || r.connected) h += `<div class="rlrow"><span class="rlwl"><span class="w">${r.w} V</span><span class="sep">·</span><span class="l">${r.l} D</span></span>${sk}<span class="chipx">${r.tot.goals} buts · ${r.tot.saves} arrêts</span></div>`;
+    h += `<div class="rlrow"><span class="rlme">${r.me ? `Toi : <b>${esc(r.me)}</b> (${esc(r.meHow)})` : "Ton pseudo sera détecté au premier match"}</span><button class="btn sm" data-act="rl-name">${r.meHow === "réglé" ? "Changer" : "Régler"}</button>${r.n ? `<button class="btn sm" data-act="rl-reset" style="margin-left:auto">Remettre à zéro</button>` : ""}</div>`;
+    b.innerHTML = h;
   }
 
   async function tick() {
@@ -200,6 +242,7 @@ footer .right{display:flex;gap:8px;margin-left:auto}
     try { draw(await api.state(seq)); } catch (e) { console.warn(e); }
   }
   window.refreshNow = tick;
+  function alert_(msg) { const n = document.createElement("p"); n.className = "rlnote"; n.style.color = "var(--red)"; n.textContent = "Pas activé : " + msg; $("#rlBody").appendChild(n); }
 
   document.addEventListener("click", async e => {
     const b = e.target.closest("[data-act]"); if (!b || !api) return;
@@ -210,6 +253,14 @@ footer .right{display:flex;gap:8px;margin-left:auto}
     else if (act === "auto") { await api.set_autostart(b.getAttribute("aria-checked") !== "true"); tick(); }
     else if (act === "ask-yes" || act === "ask-no") { await api.set_autostart(act === "ask-yes"); tick(); }
     else if (act === "guide") api.open_guide();
+    else if (act === "rl-enable") { b.disabled = true; const err = await api.rl_enable(); if (err) { b.disabled = false; rlEditing = true; alert_(err); setTimeout(() => { rlEditing = false; }, 8000); } else tick(); }
+    else if (act === "rl-reset") { await api.rl_reset(); tick(); }
+    else if (act === "rl-name") {
+      rlEditing = true;
+      $("#rlBody").querySelector(".rlme").closest(".rlrow").innerHTML = `Ton pseudo dans Rocket League <input id="rlName" maxlength="32" value="${esc(last && last.rl && last.rl.meHow === "réglé" ? last.rl.me : "")}" placeholder="vide = détection auto"> <button class="btn sm primary" data-act="rl-name-ok">OK</button>`;
+      $("#rlName").focus();
+    }
+    else if (act === "rl-name-ok") { await api.rl_name($("#rlName").value); rlEditing = false; tick(); }
     else if (act === "quit") api.quit();
   });
 

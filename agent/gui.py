@@ -55,6 +55,32 @@ class Api:
         self._app.refresh_tray()
         return self._app.st.snapshot()["autostart"]
 
+    def rl_enable(self):
+        import rl as rl_mod
+        err = rl_mod.enable_api()
+        st = self._app.st
+        if st.rl:
+            st.rl.status, st.rl.install = rl_mod.api_status()
+        if not err:
+            st.event("info", "Stats Rocket League activées dans le jeu : relance Rocket League pour qu'elles marchent.")
+        return err
+
+    def rl_reset(self):
+        st = self._app.st
+        if st.rl:
+            st.rl.reset()
+            st.event("info", "Session Rocket League remise à zéro.")
+            st.push(st.rl.summary())
+        return True
+
+    def rl_name(self, name):
+        st = self._app.st
+        if st.rl:
+            st.rl.name = str(name or "").strip()[:32]
+            st.rl.save()
+            st.push(st.rl.summary())
+        return True
+
     def open_guide(self):
         webbrowser.open(GUIDE)
 

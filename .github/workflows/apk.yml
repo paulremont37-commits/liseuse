@@ -66,7 +66,7 @@ jobs:
       - name: Fabriquer StreamDeckPC.exe
         run: |
           pip install -r agent/requirements.txt
-          pyinstaller --onefile --noconsole --name StreamDeckPC --icon agent/icon.ico --paths agent --hidden-import gui --hidden-import media --hidden-import mixer --collect-submodules pycaw --collect-submodules comtypes --collect-submodules winrt --hidden-import winrt.windows.foundation --hidden-import winrt.windows.foundation.collections --hidden-import winrt.windows.storage.streams --hidden-import winrt.windows.media.control --add-data "agent/ui.html;." --add-data "agent/icon.ico;." --add-data "agent/bricolage-800.woff2;." agent/agent.py
+          pyinstaller --onefile --noconsole --name StreamDeckPC --icon agent/icon.ico --paths agent --hidden-import gui --hidden-import media --hidden-import mixer --hidden-import rl --collect-submodules pycaw --collect-submodules comtypes --collect-submodules winrt --hidden-import winrt.windows.foundation --hidden-import winrt.windows.foundation.collections --hidden-import winrt.windows.storage.streams --hidden-import winrt.windows.media.control --add-data "agent/ui.html;." --add-data "agent/icon.ico;." --add-data "agent/bricolage-800.woff2;." agent/agent.py
 
       - name: Vérifier la musique en cours avant compilation
         shell: pwsh
@@ -84,6 +84,7 @@ jobs:
           if ($r.mixer_import -ne "ok") { Write-Output "::error::Mixer absent de l'exe : $($r.mixer_import)"; exit 1 }
           if ($r.mixer_state -is [string] -and $r.mixer_state -match "ModuleNotFound|ImportError") { Write-Output "::error::Module manquant pour le mixer : $($r.mixer_state)"; exit 1 }
           if ($r.mixer_state -is [string]) { Write-Output "::warning::Mixer sur la machine de compilation : $($r.mixer_state)" }
+          if ($r.rl_import -ne "ok") { Write-Output "::error::Stats Rocket League absentes de l'exe : $($r.rl_import)"; exit 1 }
           if ($r.gui_import -ne "ok") { Write-Output "::error::Fenêtre absente de l'exe : $($r.gui_import)"; exit 1 }
           if ($r.media_read -is [string] -and $r.media_read -match "ModuleNotFound|ImportError") { Write-Output "::error::Module manquant pour la musique : $($r.media_read)"; exit 1 }
           if ($r.media_read -is [string]) { Write-Output "::warning::Lecture de la musique sur la machine de compilation : $($r.media_read)" }

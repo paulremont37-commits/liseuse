@@ -195,6 +195,8 @@ class State:
         self.loop = None
         self.media = None           # musique en cours (media.py)
         self.media_info = ""
+        self.rl = None              # session Rocket League (rl.py)
+        self.push = lambda msg: None  # envoie un message à toutes les tablettes (remplacé par serve)
 
     def event(self, kind, text, **extra):
         with self.lock:
@@ -216,6 +218,7 @@ class State:
                 "app": APP, "ip": self.ip, "port": self.port, "code": self.code, "error": self.error,
                 "listening": self.listening, "dryrun": DRYRUN, "host": socket.gethostname(),
                 "tablets": tablets, "presses": self.presses, "music": self.media_info,
+                "rl": self.rl.summary() if self.rl else None,
                 "events": [e for e in self.events if e["seq"] > since], "seq": self.seq,
                 "autostart": autostart_on(), "canAutostart": bool(getattr(sys, "frozen", False) and sys.platform == "win32"),
                 "askAutostart": not self.cfg.get("askedAutostart") and bool(getattr(sys, "frozen", False) and sys.platform == "win32"),
@@ -233,6 +236,10 @@ class State:
                 asyncio.run_coroutine_threadsafe(ws.close(1000, "nouveau code"), self.loop)
         self.event("info", "Nouveau code créé : entre-le sur la tablette.")
         return self.code
+
+    def save_cfg(self):
+        with self.lock:
+            save_config(self.cfg)
 
     def autostart(self):
         return autostart_on()
@@ -305,13 +312,13 @@ async def handler(ws):
     with st.lock:
         st.clients[ws] = {"ip": ip, "since": time.time()}
     st.event("on", f"Tablette connectée ({ip})")
-    try:
-        import media as media_mod
-        m = media_mod.current(st)
-        if m:
-            await ws.send(json.dumps(m))
-    except Exception:
-        pass
+    for mod in ("media", "rl"):
+        try:
+            m = __import__(mod).current(st)
+            if m:
+                await ws.send(json.dumps(m))
+        except Exception:
+            pass
     try:
         async for raw in ws:
             try:
@@ -322,6 +329,14 @@ async def handler(ws):
                 await ws.send(json.dumps({"type": "pong", "id": msg.get("id")}))
             elif msg.get("type") in ("mixer_get", "mixer_set"):
                 await mixer_message(ws, msg)
+            elif msg.get("type") in ("rl_get", "rl_reset"):
+                if st.rl:
+                    if msg["type"] == "rl_reset":
+                        st.rl.reset()
+                        st.event("info", "Session Rocket League remise à zéro depuis la tablette.")
+                        await broadcast(st, st.rl.summary())
+                    else:
+                        await ws.send(json.dumps(st.rl.summary()))
             elif msg.get("type") == "press":
                 keys = validate(msg.get("keys"))
                 label = str(msg.get("label", ""))[:40]
@@ -379,11 +394,17 @@ async def broadcast(st, msg):
 
 async def serve(st):
     st.loop = asyncio.get_running_loop()
+    st.push = lambda msg: asyncio.run_coroutine_threadsafe(broadcast(st, msg), st.loop)
     try:  # widget « musique en cours » (Windows uniquement)
         import media as media_mod
         asyncio.get_running_loop().create_task(media_mod.loop(st, lambda m: broadcast(st, m)))
     except Exception as e:
         st.media_info = f"Indisponible : {type(e).__name__}: {e}"
+    try:  # session Rocket League (API officielle du jeu)
+        import rl as rl_mod
+        asyncio.get_running_loop().create_task(rl_mod.loop(st, lambda m: broadcast(st, m)))
+    except Exception as e:
+        st.event("warn", f"Stats Rocket League indisponibles : {type(e).__name__}: {e}")
         st.event("warn", "Musique en cours indisponible : " + st.media_info)
     # compression=None : messages minuscules, la compression ne ferait qu'ajouter du travail
     async with websockets.serve(handler, "0.0.0.0", st.port, ping_interval=20, ping_timeout=20, max_size=4096, compression=None):
@@ -454,6 +475,14 @@ if __name__ == "__main__":
     if "--no-autostart" in sys.argv:
         set_autostart(False)
         sys.exit(0)
+    if "--enable-rl-api" in sys.argv:
+        # relancé en administrateur par rl.enable_api() : écrit juste le fichier de réglage du jeu
+        import rl as rl_mod
+        try:
+            rl_mod.write_ini(sys.argv[sys.argv.index("--enable-rl-api") + 1])
+        except (OSError, IndexError):
+            sys.exit(1)
+        sys.exit(0)
     if "--selftest" in sys.argv:
         # Vérification automatique de l'exe (compilation GitHub) : modules présents et lecture de la musique
         res = {}
@@ -479,6 +508,12 @@ if __name__ == "__main__":
                     res["mixer_state"] = f"{type(e).__name__}: {e}"
         except Exception as e:
             res["mixer_import"] = f"{type(e).__name__}: {e}"
+        try:
+            import rl as rl_mod
+            res["rl_import"] = "ok"
+            res["rl_status"] = rl_mod.api_status()[0]
+        except Exception as e:
+            res["rl_import"] = f"{type(e).__name__}: {e}"
         try:
             import gui  # noqa: F401
             res["gui_import"] = "ok"

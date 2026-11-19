@@ -49,7 +49,7 @@ La même coque fait aussi un Stream Deck : la tablette devient une grille de gro
 Fermer la fenêtre range le programme près de l'horloge (il continue de marcher) ; clic droit sur l'icône → **Quitter** pour l'arrêter. `StreamDeckPC.exe --console` lance l'ancienne version en invite de commande.
 3. Pour assigner un bouton dans Discord, Voicemod ou Medal : clique sur le champ du raccourci dans le logiciel, puis appuie sur le bouton de la tablette.
 
-Le programme PC n'exécute que des raccourcis clavier et des touches multimédia, et ne règle que des volumes (mixer) : aucune commande ni aucun fichier ne peut être lancé depuis la tablette, et il faut le code pour s'y connecter. Il envoie aussi à la tablette le titre en cours de lecture (case Musique).
+Le programme PC n'exécute que des raccourcis clavier et des touches multimédia, et ne règle que des volumes (mixer) : aucune commande ni aucun fichier ne peut être lancé depuis la tablette, et il faut le code pour s'y connecter. Il envoie aussi à la tablette le titre en cours de lecture (case Musique) et ta session Rocket League (case Rocket League, lue via l'API officielle du jeu, à activer une fois depuis la fenêtre du programme).
 
 ## Dogues (appli de fan LOSC, non officielle)
 

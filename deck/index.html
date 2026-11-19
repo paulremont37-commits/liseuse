@@ -131,6 +131,45 @@ button{cursor:pointer}
 #sleep .sbat{font-weight:700;font-size:22px;color:#4a4d60}
 #sleep p{margin:16px 0 0;font-size:14px}
 body.asleep *,body.asleep *::before,body.asleep *::after{animation:none!important;transition:none!important}
+.tile.rltile{align-items:stretch;justify-content:space-between;gap:8px;padding:14px 16px;text-align:left}
+.rlh{display:flex;align-items:center;gap:8px;font-size:11.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--c);text-shadow:0 0 8px color-mix(in srgb,var(--c) 70%,transparent)}
+.rlh svg{width:20px!important;height:20px;flex:none}
+.rlh small{margin-left:auto;color:var(--ok);letter-spacing:.06em;text-shadow:0 0 8px var(--ok)}
+.rlbody{display:flex;flex-direction:column;gap:7px;min-width:0}
+.tile.rltile.wide .rlbody{flex-direction:row;flex-wrap:wrap;align-items:center;column-gap:16px}
+.rlwl{display:flex;gap:12px;font-family:var(--f-display);font-weight:800;font-size:clamp(20px,2.6vw,34px);letter-spacing:.01em;line-height:1}
+.rlwl .w,.rlmodes .w,#sleep .w{color:var(--ok);text-shadow:0 0 14px color-mix(in srgb,var(--ok) 55%,transparent)}
+.rlwl .l,.rlmodes .l,#sleep .l{color:var(--bad);text-shadow:0 0 14px color-mix(in srgb,var(--bad) 55%,transparent)}
+.rls{align-self:flex-start;font-size:12.5px;font-weight:800;border-radius:8px;padding:3px 9px;border:1.5px solid}
+.rls.up{color:var(--ok);border-color:var(--ok);box-shadow:0 0 10px -3px var(--ok)}
+.rls.down{color:var(--bad);border-color:var(--bad);box-shadow:0 0 10px -3px var(--bad)}
+.rldots{display:flex;gap:5px;align-items:center}
+.rldots i{width:10px;height:10px;border-radius:50%;background:var(--muted)}
+.rldots i.w{background:var(--ok);box-shadow:0 0 6px var(--ok)}.rldots i.l{background:var(--bad);box-shadow:0 0 6px var(--bad)}
+.rltot{color:var(--muted);font-weight:600;font-size:13px;width:100%}
+.rlidle{color:var(--muted);font-weight:600;font-size:14px;line-height:1.35}
+.sheet.rlsheet{width:min(900px,100%)}
+.rlbig{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:6px 0 14px}
+.rlbig .rlwl{font-size:44px}
+.rlgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.rlstat{border:1px solid var(--line);border-radius:14px;padding:12px 14px;background:#06060a}
+.rlstat b{display:block;font-family:var(--f-display);font-weight:800;font-size:26px;color:var(--fg)}
+.rlstat span{color:var(--muted);font-size:12.5px}
+.rlmodes{display:flex;flex-wrap:wrap;gap:8px}
+.rlmodes div{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:12px;padding:8px 12px}
+.rlmodes span{font-weight:600}
+.rllast{display:flex;flex-direction:column}
+.rllast > div{display:grid;grid-template-columns:34px minmax(0,1fr) 110px 150px 56px;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--line)}
+.rllast .rr{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;font-weight:800;border:1.5px solid var(--muted);color:var(--muted)}
+.rllast .w .rr{border-color:var(--ok);color:var(--ok);box-shadow:0 0 10px -3px var(--ok)}
+.rllast .l .rr{border-color:var(--bad);color:var(--bad);box-shadow:0 0 10px -3px var(--bad)}
+.rllast .rm{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rllast .rs{font-variant-numeric:tabular-nums;font-weight:700}
+.rllast .rme,.rllast .rt{color:var(--muted);font-size:13px}
+@media (max-width:640px){.rlgrid{grid-template-columns:repeat(2,minmax(0,1fr))}.rllast > div{grid-template-columns:30px minmax(0,1fr) auto}.rllast .rme,.rllast .rt{display:none}}
+#sleep .srl{display:flex;align-items:center;gap:14px;font-family:var(--f-display);font-weight:800;font-size:24px;margin-top:6px;opacity:.75}
+#sleep .srl:empty{display:none}
+#sleep .srl > span:first-child{font-family:var(--f-ui);font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:#4a4d60}
 .hint-s{color:var(--muted);font-size:13px;margin:8px 0 0}
 .grid{will-change:transform}
 /* La grille gère elle-même les gestes : sans ça, Android « vole » le glissé pour faire défiler
@@ -379,6 +418,7 @@ function connect() {
     else if (m.type === "result") { const p = C.pending.get(m.id); if (p) { C.pending.delete(m.id); p(m.ok, m.reason); } }
     else if (m.type === "media") onMedia(m);
     else if (m.type === "mixer") onMixer(m);
+    else if (m.type === "rl") onRl(m);
   };
   ws.onclose = () => { C.ws = null; if (C.state === "on") toast("Connexion au PC perdue. Nouvelle tentative…"); later(); };
 }
@@ -414,6 +454,7 @@ function renderTabs() {
 }
 function tileHTML(t, span) {
   if (t.kind === "media") return mediaHTML(t, span || 1);
+  if (t.kind === "rl") return rlHTML(t, span || 1);
   if (t.kind === "mixer") return `<button class="tile mixertile" data-tile="${t.id}" style="--c:${COLORS[t.color] || COLORS.mod}">${ICONS.sliders}<span class="lbl">${esc(t.label || "Mixer")}</span><span class="keys">Volume par appli</span></button>`;
   const on = t.toggle && st.states[t.id];
   return `<button class="tile${on ? " on" : ""}" data-tile="${t.id}" style="--c:${COLORS[t.color] || COLORS.plain};--oc:${COLORS[t.onColor] || COLORS.clip}">
@@ -433,7 +474,7 @@ function pageLayout(n, edit) {
     const t = tiles[i];
     // Widget large : prend aussi les cases de droite si elles sont libres et sur la même ligne
     let span = 1;
-    if (t && t.kind === "media" && t.w > 1) while (span < t.w && i % cols + span < cols && !tiles[i + span]) span++;
+    if (t && (t.kind === "media" || t.kind === "rl") && t.w > 1) while (span < t.w && i % cols + span < cols && !tiles[i + span]) span++;
     for (let k = 1; k < span; k++) covered.add(i + k);
     html += t ? tileHTML(t, span) : editing ? `<button class="tile slot" data-slot="${i}" aria-label="Ajouter un bouton ici">${PLUS}</button>` : `<div class="tile ghost" aria-hidden="true"></div>`;
   }
@@ -446,7 +487,7 @@ function renderGrid() {
   g.style.gridTemplateColumns = `repeat(${L.cols},minmax(0,1fr))`; g.style.gridTemplateRows = `repeat(${L.rows},minmax(0,1fr))`;
   g.classList.toggle("editing", editing);
   g.innerHTML = L.html;
-  paintMedia();
+  paintMedia(); paintRl();
 }
 function render() { renderTabs(); renderGrid(); $("#editBtn").setAttribute("aria-pressed", String(editing)); }
 function showDeck() { $("#setup").hidden = true; $("#grid").hidden = false; render(); }
@@ -508,6 +549,62 @@ function paintMedia() {
   });
 }
 setInterval(() => { if (M.d && M.d.playing && !asleep) paintMedia(); }, 500);
+
+/* ---------------- Rocket League : session (victoires, défaites, série, stats) ---------------- */
+const RLICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 15h4l2-4h6l3 4h3v3H3z"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/><path d="M9 11 10.5 7h4"/></svg>';
+const RL = { d: null };
+function onRl(m) { RL.d = m; paintRl(); if ($("#rlPanel")) drawRl(); }
+function rlIdle(d) {
+  if (C.state !== "on") return "PC non connecté";
+  if (!d) return "Mets à jour Stream Deck PC";
+  if (d.status === "nogame") return "Rocket League introuvable sur le PC";
+  if (d.status === "off") return "Active les stats dans Stream Deck PC";
+  if (!d.connected && !d.n) return "Lance Rocket League sur le PC";
+  return "";
+}
+const rlDots = (d, n) => (d.last || []).slice(0, n).reverse().map(r => `<i class="${r.win === true ? "w" : r.win === false ? "l" : "u"}"></i>`).join("");
+const rlStreak = d => d.streak > 0 ? `<span class="rls up">Série ${d.streak} V</span>` : d.streak < 0 ? `<span class="rls down">Série ${-d.streak} D</span>` : "";
+function rlHTML(t, span) {
+  return `<button class="tile rltile${span > 1 ? " wide" : ""}${span > 2 ? " w3" : ""}" data-tile="${t.id}" aria-label="Session Rocket League" style="--c:${COLORS[t.color] || COLORS.music}${span > 1 ? ";grid-column:span " + span : ""}">
+    <span class="rlh">${RLICON}<span>Rocket League</span><small class="rlon"></small></span><div class="rlbody"></div></button>`;
+}
+function paintRl() {
+  const d = RL.d, idle = rlIdle(d);
+  document.querySelectorAll(".tile.rltile").forEach(el => {
+    el.querySelector(".rlon").textContent = d && d.connected ? "en jeu" : "";
+    const wide = el.classList.contains("wide");
+    el.querySelector(".rlbody").innerHTML = idle ? `<span class="rlidle">${esc(idle)}</span>` :
+      `<span class="rlwl"><b class="w">${d.w} V</b><b class="l">${d.l} D</b></span>${rlStreak(d)}
+       ${d.n ? `<span class="rldots">${rlDots(d, wide ? 10 : 6)}</span>` : `<span class="rlidle">Aucun match en ligne pour l'instant</span>`}
+       ${wide && d.n ? `<span class="rltot">${d.tot.goals} buts · ${d.tot.assists} passes · ${d.tot.saves} arrêts</span>` : ""}`;
+  });
+  const sr = document.getElementById("sleepRl");
+  if (sr) sr.innerHTML = d && d.n ? `<span>Rocket League</span><b class="w">${d.w} V</b><b class="l">${d.l} D</b>${rlStreak(d)}<span class="rldots">${rlDots(d, 10)}</span>` : "";
+}
+function openRl() {
+  $("#sheetRoot").innerHTML = `<div class="scrim" data-act="scrim"><div class="sheet rlsheet" role="dialog" aria-modal="true" id="rlPanel"><div id="rlIn"></div></div></div>`;
+  drawRl();
+  if (C.state === "on" && C.ws) try { C.ws.send(JSON.stringify({ type: "rl_get" })); } catch (e) {}
+}
+function drawRl(confirmReset) {
+  const d = RL.d, idle = rlIdle(d), box = $("#rlIn"); if (!box) return;
+  const head = `<div class="mxhead"><h2>${RLICON} Rocket League</h2><span class="mxpc">${d && d.connected ? "en jeu" : "session"}${d && d.started ? " · depuis " + new Date(d.started * 1000).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : ""}</span><button class="btn" data-act="close">Fermer</button></div>`;
+  if (idle || !d) { box.innerHTML = head + `<p class="mxnote">${esc(idle || "Chargement…")}</p>`; return; }
+  const n = d.n || 0, pct = d.w + d.l ? Math.round(100 * d.w / (d.w + d.l)) : 0;
+  const avg = k => n ? (d.tot[k] / n).toFixed(1).replace(".", ",") : "0";
+  const stat = (v, l, cls = "") => `<div class="rlstat ${cls}"><b>${v}</b><span>${l}</span></div>`;
+  box.innerHTML = head + `
+    <div class="rlbig"><span class="rlwl"><b class="w">${d.w} V</b><b class="l">${d.l} D</b></span>${rlStreak(d)}<span class="rldots">${rlDots(d, 12)}</span></div>
+    <div class="rlgrid">${stat(n, "matchs")}${stat(pct + " %", "victoires")}${stat(d.tot.goals, "buts · " + avg("goals") + "/match")}${stat(d.tot.assists, "passes · " + avg("assists") + "/match")}${stat(d.tot.saves, "arrêts · " + avg("saves") + "/match")}${stat(d.tot.shots, "tirs")}${stat(d.tot.demos, "démos")}${stat(d.tot.score, "points")}</div>
+    ${d.modes.length ? `<h3 class="mxh">Par mode</h3><div class="rlmodes">${d.modes.map(m => `<div><span>${esc(m.mode)}</span><b class="w">${m.w} V</b><b class="l">${m.l} D</b></div>`).join("")}</div>` : ""}
+    ${(d.last || []).length ? `<h3 class="mxh">Derniers matchs</h3><div class="rllast">${d.last.map(r => `<div class="${r.win === true ? "w" : r.win === false ? "l" : ""}">
+        <span class="rr">${r.win === true ? "V" : r.win === false ? "D" : "?"}</span><span class="rm">${esc(r.mode)}</span>
+        <span class="rs">${r.us != null ? r.us + " – " + r.them + (r.ot ? " (prol.)" : "") : ""}</span>
+        <span class="rme">${r.me ? `${r.me.goals} B · ${r.me.assists} P · ${r.me.saves} A` : ""}</span>
+        <span class="rt">${new Date(r.t * 1000).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</span></div>`).join("")}</div>` : `<p class="mxnote">Aucun match en ligne terminé pour l'instant. L'entraînement et les parties hors ligne ne comptent pas.</p>`}
+    <p class="mxnote">${d.me ? `Joueur suivi : <b>${esc(d.me)}</b> (${esc(d.meHow)}, modifiable dans Stream Deck PC).` : "Ton pseudo sera détecté au premier match."} Le jeu ne transmet pas le MMR.</p>
+    ${confirmReset ? `<div class="confirm"><span>Remettre la session à zéro ?</span><button class="btn" data-act="rl-keep">Annuler</button><button class="btn danger solid" data-act="rl-reset-yes">Remettre à zéro</button></div>` : `<div class="foot"><button class="btn danger left" data-act="rl-reset">Remettre à zéro</button></div>`}`;
+}
 
 /* ---------------- mixer : volume de chaque appli du PC ---------------- */
 const MX = { data: null, timer: 0, wait: 0, drag: null, sent: 0, pend: null };
@@ -630,6 +727,7 @@ addEventListener("pointerup", e => {
   if (g.dead || !g.el) return;
   const t = findTile(g.el.dataset.tile); if (!t) return;
   if (t.kind === "media") { mediaPress(g.mk ? g.mk.dataset.mkey : "media_play_pause", g.mk || g.el); return; }
+  if (t.kind === "rl") { swallowClick = true; setTimeout(() => { swallowClick = false; }, 500); openRl(); return; }
   if (t.kind === "mixer") {
     // Au doigt, Android envoie un « clic » juste après le relâchement : il tomberait sur le fond du panneau
     // qui vient de s'ouvrir et le refermerait aussitôt. On l'ignore.
@@ -779,7 +877,7 @@ grid.addEventListener("click", e => {
   if (el.classList.contains("slot")) return openEditor(null, +el.dataset.slot);
   const t = findTile(el.dataset.tile); if (!t) return;
   if (editing) return openEditor(t);
-  if (e.detail === 0) { if (t.kind === "mixer") openMixer(); else if (t.kind === "media") { const mk = e.target.closest("[data-mkey]"); mediaPress(mk ? mk.dataset.mkey : "media_play_pause", el); } else press(t); } // clavier : pas de pointerdown
+  if (e.detail === 0) { if (t.kind === "rl") openRl(); else if (t.kind === "mixer") openMixer(); else if (t.kind === "media") { const mk = e.target.closest("[data-mkey]"); mediaPress(mk ? mk.dataset.mkey : "media_play_pause", el); } else press(t); } // clavier : pas de pointerdown
 });
 async function press(t) {
   const sent = sendKeys(t.keys, t.label); // part tout de suite
@@ -804,7 +902,7 @@ function openEditor(t, slot) {
 }
 function drawEditor(confirmDel) {
   const d = draft;
-  const typeRow = d.isNew ? `<div class="chips" style="margin-bottom:14px"><button class="chip" data-tkind="button" aria-pressed="${d.kind !== "media"}">Bouton</button><button class="chip" data-tkind="media" aria-pressed="${d.kind === "media"}">${ICONS.music} Musique en cours</button><button class="chip" data-tkind="mixer" aria-pressed="${d.kind === "mixer"}">${ICONS.sliders} Mixer</button></div>` : "";
+  const typeRow = d.isNew ? `<div class="chips" style="margin-bottom:14px"><button class="chip" data-tkind="button" aria-pressed="${d.kind !== "media"}">Bouton</button><button class="chip" data-tkind="media" aria-pressed="${d.kind === "media"}">${ICONS.music} Musique en cours</button><button class="chip" data-tkind="mixer" aria-pressed="${d.kind === "mixer"}">${ICONS.sliders} Mixer</button><button class="chip" data-tkind="rl" aria-pressed="${d.kind === "rl"}">${RLICON} Rocket League</button></div>` : "";
   if (d.kind === "mixer") {
     $("#sheetRoot").innerHTML = `<div class="scrim" data-act="scrim"><div class="sheet" role="dialog" aria-modal="true">
       <h2>${d.isNew ? "Nouvelle case" : "Mixer"}</h2>${typeRow}
@@ -816,14 +914,15 @@ function drawEditor(confirmDel) {
     </div></div>`;
     return;
   }
-  if (d.kind === "media") {
+  if (d.kind === "media" || d.kind === "rl") {
+    const isRl = d.kind === "rl";
     $("#sheetRoot").innerHTML = `<div class="scrim" data-act="scrim"><div class="sheet" role="dialog" aria-modal="true">
-      <h2>${d.isNew ? "Nouvelle case" : "Musique en cours"}</h2>${typeRow}
-      <div class="help">Affiche ce qui joue sur le PC (Deezer, Spotify, YouTube…) : pochette, titre, artiste, avancement, avec précédent / lecture / suivant. Il faut Stream Deck PC à jour sur le PC.</div>
+      <h2>${d.isNew ? "Nouvelle case" : isRl ? "Rocket League" : "Musique en cours"}</h2>${typeRow}
+      <div class="help">${isRl ? "Ta session Rocket League (matchs en ligne) : victoires, défaites, série en cours et tes stats cumulées. Touche la case pour le détail. Il faut activer les stats dans Stream Deck PC (carte Rocket League)." : "Affiche ce qui joue sur le PC (Deezer, Spotify, YouTube…) : pochette, titre, artiste, avancement, avec précédent / lecture / suivant. Il faut Stream Deck PC à jour sur le PC."}</div>
       <h3>Taille</h3><div class="chips">${[1, 2, 3].map(n => `<button class="chip" data-size="${n}" aria-pressed="${(d.w || 1) === n}">${n} case${n > 1 ? "s" : ""}</button>`).join("")}</div>
       ${(d.w || 1) > 1 ? `<p class="hint-s">Les ${d.w - 1 > 1 ? d.w - 1 + " cases" : "case"} à sa droite doivent rester libres, sur la même ligne.</p>` : ""}
       <h3>Couleur</h3><div class="chips">${Object.entries(COLORS).map(([k, v]) => `<button class="sw" style="--c:${v}" data-color="${k}" aria-pressed="${d.color === k}" aria-label="${k}"></button>`).join("")}</div>
-      ${confirmDel ? `<div class="confirm"><span>Supprimer la case musique ?</span><button class="btn" data-act="keep">Garder</button><button class="btn danger solid" data-act="del-yes">Supprimer</button></div>` : ""}
+      ${confirmDel ? `<div class="confirm"><span>Supprimer la case ${isRl ? "Rocket League" : "musique"} ?</span><button class="btn" data-act="keep">Garder</button><button class="btn danger solid" data-act="del-yes">Supprimer</button></div>` : ""}
       <div class="foot">${d.isNew ? "" : `<button class="btn danger left" data-act="del">Supprimer</button>`}<button class="btn" data-act="close">Annuler</button><button class="btn primary" data-act="save-tile">Enregistrer</button></div>
     </div></div>`;
     return;
@@ -901,6 +1000,7 @@ function openGuide() {
       <li>Pour changer de page, <b>glisse vers la gauche ou la droite</b> n'importe où sur la grille (ou touche le nom de la page en haut).</li>
       <li>Case <b>Musique en cours</b> : en modification, touche une case vide puis choisis <b>Musique en cours</b> (1, 2 ou 3 cases de large). Elle affiche ce qui joue sur le PC (Deezer, Spotify…) avec précédent / lecture / suivant.</li>
       <li><b>Batterie</b> : affichée en haut à droite. Sans toucher la tablette (1 min par défaut, réglable dans Réglages → Veille de l'écran), l'écran passe au minimum avec l'heure ; un toucher le rallume sans appuyer sur un bouton.</li>
+      <li><b>Rocket League</b> : touche une case vide (+) en modification et choisis <b>Rocket League</b> (1 à 3 cases). Elle montre ta session (victoires, défaites, série) ; touche-la pour le détail. La session s'affiche aussi sur l'écran de veille. À activer une fois dans Stream Deck PC (carte Rocket League).</li>
       <li><b>Mixer</b> : bouton à curseurs en haut à droite (ou une case Mixer : touche une case vide (+) en modification et choisis <b>Mixer</b>). Elle ouvre le volume général et le volume de chaque appli du PC (Discord, Deezer, jeu…), avec un bouton muet chacune.</li>
       <li>Pour <b>déplacer</b> un bouton, fais-le glisser : sur une case vide il s'y pose, sur un autre bouton ils échangent leur place, sur un onglet il part dans cette page.</li>
       <li>Touche une <b>case vide (+)</b> pour créer un bouton à cet endroit. <b>+ Page</b> crée une page.</li>
@@ -935,6 +1035,7 @@ document.addEventListener("click", async e => {
     const tk = t.closest("[data-tkind]");
     if (tk) { readDraft(); const k = tk.dataset.tkind;
       if (k === "media") Object.assign(draft, { kind: "media", label: "Musique", color: "music", w: 2, keys: [], toggle: false });
+      else if (k === "rl") { Object.assign(draft, { kind: "rl", label: "Rocket League", color: "music", w: 2, keys: [], toggle: false }); }
       else if (k === "mixer") { delete draft.w; Object.assign(draft, { kind: "mixer", label: "Mixer", color: "mod", icon: "sliders", keys: [], toggle: false }); }
       else { delete draft.kind; delete draft.w; Object.assign(draft, { label: "Nouveau", color: "sound", icon: "star", keys: ["ctrl", "shift", "f21"] }); }
       drawEditor(); return; }
@@ -950,6 +1051,9 @@ document.addEventListener("click", async e => {
   const act = a.dataset.act;
   if (act === "scrim" && t !== a) return;
   if (act === "scrim" || act === "close") { $("#sheetRoot").innerHTML = ""; draft = null; return; }
+  if (act === "rl-reset") { drawRl(true); return; }
+  if (act === "rl-keep") { drawRl(); return; }
+  if (act === "rl-reset-yes") { if (C.state === "on" && C.ws) try { C.ws.send(JSON.stringify({ type: "rl_reset" })); } catch (e) {} drawRl(); toast("Session remise à zéro."); return; }
   if (act === "toggle") { readDraft(); draft.toggle = !draft.toggle; drawEditor(); }
   if (act === "flip-state") { readDraft(); st.states[draft.id] = !st.states[draft.id]; save(); renderGrid(); drawEditor(); }
   else if (act === "test") { readDraft(); const r = await sendKeys(draft.keys, draft.label); toast(r.ok ? `Envoyé : ${describe(draft.keys)}` : `Échec : ${r.reason}.`); drawEditor(); }
@@ -958,7 +1062,7 @@ document.addEventListener("click", async e => {
     if (isNew) placeTile(pageTiles(), draft, addAt); else { for (const p of st.pages) { const j = p.tiles.findIndex(x => x && x.id === draft.id); if (j >= 0) p.tiles[j] = draft; } }
     if (!draft.toggle) delete st.states[draft.id];
     let room = "";
-    if (draft.kind === "media" && draft.w > 1) {
+    if ((draft.kind === "media" || draft.kind === "rl") && draft.w > 1) {
       const tl = pageTiles(), i = tl.findIndex(x => x && x.id === draft.id), cols = Math.max(2, Math.min(innerWidth < 640 ? 3 : 8, st.cols));
       let free = 1; while (free < draft.w && i % cols + free < cols && !tl[i + free]) free++;
       if (i >= 0 && free < draft.w) room = ` Libère ${draft.w - 1 > 1 ? "les " + (draft.w - 1) + " cases" : "la case"} à sa droite (ou déplace-la en début de ligne) pour l'avoir sur ${draft.w} cases.`;
@@ -1038,8 +1142,8 @@ function goSleep() {
   asleep = true;
   document.body.classList.add("asleep");
   let ov = $("#sleep");
-  if (!ov) { ov = document.createElement("div"); ov.id = "sleep"; ov.innerHTML = `<div class="sclock" id="sleepClock"></div><div class="sbat" id="sleepBat"></div><p>Touche l'écran pour rallumer</p>`; document.body.appendChild(ov); }
-  ov.hidden = false; $("#sleepClock").textContent = $("#clock").textContent; paintBattery();
+  if (!ov) { ov = document.createElement("div"); ov.id = "sleep"; ov.innerHTML = `<div class="sclock" id="sleepClock"></div><div class="sbat" id="sleepBat"></div><div class="srl" id="sleepRl"></div><p>Touche l'écran pour rallumer</p>`; document.body.appendChild(ov); }
+  ov.hidden = false; $("#sleepClock").textContent = $("#clock").textContent; paintBattery(); paintRl();
   call("setBrightness", 0.01); call("lowLatency", false); pingEvery(30000);
 }
 function wake() {
