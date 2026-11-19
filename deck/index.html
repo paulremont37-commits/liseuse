@@ -261,6 +261,16 @@ body.asleep *,body.asleep *::before,body.asleep *::after{animation:none!importan
 .tile{background:#000;border:2px solid color-mix(in srgb,var(--c) 65%,transparent);
   box-shadow:0 0 22px -8px var(--c),inset 0 0 26px -14px var(--c);transition:transform .08s ease,box-shadow .15s,border-color .15s,background .15s}
 .tile svg{filter:drop-shadow(0 0 6px color-mix(in srgb,var(--c) 80%,transparent))}
+.tile img.tico{width:clamp(28px,34%,72px);height:auto;aspect-ratio:1;object-fit:contain;flex:none;filter:drop-shadow(0 0 6px color-mix(in srgb,var(--c) 70%,transparent));pointer-events:none}
+.tile.on img.tico{filter:drop-shadow(0 0 10px var(--oc))}
+.icons button img{width:28px;height:28px;object-fit:contain;pointer-events:none}
+.icons button.cur{border-color:var(--music)}
+.logos{margin-top:12px;display:flex;flex-direction:column;gap:10px}
+.lsearch{display:flex;gap:8px}
+.lsearch input{flex:1;min-width:0;height:44px;border-radius:12px;border:1px solid var(--line);background:#0b0b11;color:var(--fg);padding:0 14px;font:inherit}
+.lquick{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.lquick .chip{height:36px;font-size:13px;flex:none}
+.lres .icons{max-height:236px;overflow:auto;scrollbar-width:thin}
 .tile .lbl{color:var(--fg);text-shadow:0 0 10px color-mix(in srgb,var(--c) 45%,transparent)}
 .tile.down{transform:scale(.95);border-color:var(--c);box-shadow:0 0 34px -4px var(--c),inset 0 0 40px -10px var(--c)}
 .tile.on{background:color-mix(in srgb,var(--oc) 12%,#000);border-color:var(--oc);box-shadow:0 0 30px -4px var(--oc),0 0 70px -24px var(--oc),inset 0 0 36px -10px var(--oc)}
@@ -460,7 +470,7 @@ function tileHTML(t, span) {
   if (t.kind === "mixer") return `<button class="tile mixertile" data-tile="${t.id}" style="--c:${COLORS[t.color] || COLORS.mod}">${ICONS.sliders}<span class="lbl">${esc(t.label || "Mixer")}</span><span class="keys">Volume par appli</span></button>`;
   const on = t.toggle && st.states[t.id];
   return `<button class="tile${on ? " on" : ""}" data-tile="${t.id}" style="--c:${COLORS[t.color] || COLORS.plain};--oc:${COLORS[t.onColor] || COLORS.clip}">
-    <span class="flag">${esc(t.onLabel || "Actif")}</span>${ICONS[t.icon] || ICONS.keyboard}<span class="lbl">${esc(t.label)}</span><span class="keys">${esc(describe(t.keys))}</span></button>`;
+    <span class="flag">${esc(t.onLabel || "Actif")}</span>${t.svg ? `<img class="tico" src="${logoSrc(t.svg, COLORS[t.color] || COLORS.plain)}" alt="">` : ICONS[t.icon] || ICONS.keyboard}<span class="lbl">${esc(t.label)}</span><span class="keys">${esc(describe(t.keys))}</span></button>`;
 }
 function pageLayout(n, edit) {
   const page = st.pages[n] || st.pages[0];
@@ -935,7 +945,12 @@ function drawEditor(confirmDel) {
     <h2>${d.isNew ? "Nouveau bouton" : "Modifier le bouton"}</h2>${typeRow}
     <label class="field"><span>Nom</span><input id="eLabel" maxlength="24" value="${esc(d.label)}"></label>
     <h3>Couleur</h3><div class="chips">${Object.entries(COLORS).map(([k, v]) => `<button class="sw" style="--c:${v}" data-color="${k}" aria-pressed="${d.color === k}" aria-label="${k}"></button>`).join("")}</div>
-    <h3>Icône</h3><div class="icons">${Object.entries(ICONS).map(([k, v]) => `<button data-icon="${k}" aria-pressed="${d.icon === k}" aria-label="${k}">${v}</button>`).join("")}</div>
+    <h3>Icône</h3><div class="icons">${d.svg ? `<button class="cur" aria-pressed="true" aria-label="Logo choisi"><img src="${logoSrc(d.svg, COLORS[d.color] || COLORS.plain)}" alt=""></button>` : ""}${Object.entries(ICONS).map(([k, v]) => `<button data-icon="${k}" aria-pressed="${!d.svg && d.icon === k}" aria-label="${k}">${v}</button>`).join("")}</div>
+    <div class="logos">
+      <form class="lsearch" id="logoForm"><input id="logoQ" type="search" enterkeyhint="search" placeholder="Logos en ligne : Discord, Spotify, Twitch…" value="${esc(LG.q)}" autocomplete="off" aria-label="Chercher un logo"><button class="chip" type="submit">Chercher</button></form>
+      <div class="chips lquick">${LOGO_QUICK.map(q => `<button class="chip" data-logoq="${esc(q)}">${esc(q)}</button>`).join("")}</div>
+      <div class="lres" id="logoRes">${logoResHTML()}</div>
+    </div>
     <h3>Action</h3><div class="chips"><button class="chip" data-kind="hotkey" aria-pressed="${!media}">Raccourci clavier</button><button class="chip" data-kind="media" aria-pressed="${!!media}">Musique et volume</button></div>
     ${media ? `<div class="chips" style="margin-top:10px">${Object.entries(MEDIA).map(([k, v]) => `<button class="chip" data-media="${k}" aria-pressed="${d.keys[0] === k}">${v}</button>`).join("")}</div>`
       : `<div class="row" style="margin-top:10px;align-items:flex-end"><div class="chips">${["ctrl", "alt", "shift"].map(m => `<button class="chip" data-mod="${m}" aria-pressed="${mods.includes(m)}">${KEYNAME[m]}</button>`).join("")}</div>
@@ -948,12 +963,58 @@ function drawEditor(confirmDel) {
     <div class="foot">${d.isNew ? "" : `<button class="btn danger left" data-act="del">Supprimer</button>`}<button class="btn" data-act="test">Tester</button><button class="btn" data-act="close">Annuler</button><button class="btn primary" data-act="save-tile">Enregistrer</button></div>
   </div></div>`;
 }
+/* ---- logos en ligne (bibliothèque Iconify : logos de marques et icônes libres) ----
+   Le logo choisi est copié dans le bouton : il reste affiché sans connexion. */
+const LG = { q: "", res: null, busy: false, err: "" };
+const LOGO_QUICK = ["Discord", "Spotify", "Deezer", "Twitch", "YouTube", "OBS", "Steam", "Epic Games", "Rocket League", "Voicemod", "Medal", "Chrome"];
+const ICONIFY = "https://api.iconify.design";
+function logoSrc(svg, color) {
+  // les logos d'une seule couleur prennent la couleur néon du bouton ; les logos en couleurs restent tels quels
+  // les couleurs des boutons sont des variables CSS : on prend leur vraie valeur (une image SVG ne les connaît pas)
+  const m = /^var\((--[\w-]+)\)$/.exec(color || "");
+  if (m) color = getComputedStyle(document.documentElement).getPropertyValue(m[1]).trim() || "#fff";
+  return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(String(svg).replace(/currentColor/g, color || "#fff"));
+}
+function logoResHTML() {
+  if (LG.busy) return `<p class="hint-s">Recherche…</p>`;
+  if (LG.err) return `<p class="hint-s">${esc(LG.err)}</p>`;
+  if (!LG.res) return `<p class="hint-s">Cherche une marque ou un objet : le logo est copié dans le bouton, rien n'est téléchargé sur la tablette.</p>`;
+  if (!LG.res.length) return `<p class="hint-s">Aucun logo trouvé pour « ${esc(LG.q)} ».</p>`;
+  return `<div class="icons">${LG.res.map(n => { const [p, i] = n.split(":"); return `<button data-logo="${esc(n)}" aria-label="${esc(i)}" title="${esc(n)}"><img loading="lazy" src="${ICONIFY}/${encodeURIComponent(p)}/${encodeURIComponent(i)}.svg?height=28&color=%23f4f6ff" alt=""></button>`; }).join("")}</div>`;
+}
+async function searchLogos(q) {
+  q = q.trim(); if (!q) return;
+  LG.q = q; LG.busy = true; LG.err = ""; paintLogos();
+  try {
+    const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 10000);
+    // d'abord les marques (Simple Icons, Logos), puis le reste des icônes libres
+    const url = (pre) => `${ICONIFY}/search?query=${encodeURIComponent(q)}&limit=64${pre ? "&prefixes=" + pre : ""}`;
+    const [a, b] = await Promise.all([fetch(url("simple-icons,logos,skill-icons,devicon"), { signal: ctl.signal }), fetch(url(""), { signal: ctl.signal })]);
+    clearTimeout(tm);
+    const ja = a.ok ? await a.json() : { icons: [] }, jb = b.ok ? await b.json() : { icons: [] };
+    LG.res = [...new Set([...(ja.icons || []), ...(jb.icons || [])])].slice(0, 96);
+  } catch (e) { LG.res = null; LG.err = "Pas de connexion à la bibliothèque de logos (Wi-Fi ?)."; }
+  LG.busy = false; paintLogos();
+}
+function paintLogos() { const r = $("#logoRes"); if (r) r.innerHTML = logoResHTML(); }
+async function pickLogo(name) {
+  const [p, i] = name.split(":");
+  try {
+    const r = await fetch(`${ICONIFY}/${encodeURIComponent(p)}/${encodeURIComponent(i)}.svg`);
+    const svg = (await r.text()).trim();
+    if (!r.ok || !/^<svg[\s>]/i.test(svg) || svg.length > 40000 || /<script|on\w+=/i.test(svg)) throw new Error("logo invalide");
+    readDraft(); draft.svg = svg; draft.icon = "logo"; drawEditor();
+    const s = $("#sheetRoot .sheet"); const h = s && s.querySelector(".icons"); if (h) h.scrollIntoView({ block: "center" });
+  } catch (e) { toast("Impossible de récupérer ce logo."); }
+}
+
 function readDraft() {
   const l = $("#eLabel"); if (l) draft.label = l.value.trim() || draft.label;
   const o = $("#eOn"); if (o) draft.onLabel = o.value.trim();
   const k = $("#eKey"); if (k) { const mods = draft.keys.filter(x => KEYNAME[x]); draft.keys = [...mods, k.value]; }
 }
 function pageTiles() { return st.pages[st.page].tiles; }
+document.addEventListener("submit", e => { if (e.target.id === "logoForm") { e.preventDefault(); searchLogos($("#logoQ").value); } });
 
 /* ---------------- réglages ---------------- */
 function openSettings(confirmReset) {
@@ -1002,6 +1063,7 @@ function openGuide() {
       <li>Pour changer de page, <b>glisse vers la gauche ou la droite</b> n'importe où sur la grille (ou touche le nom de la page en haut).</li>
       <li>Case <b>Musique en cours</b> : en modification, touche une case vide puis choisis <b>Musique en cours</b> (1, 2 ou 3 cases de large). Elle affiche ce qui joue sur le PC (Deezer, Spotify…) avec précédent / lecture / suivant.</li>
       <li><b>Batterie</b> : affichée en haut à droite. Sans toucher la tablette (1 min par défaut, réglable dans Réglages → Veille de l'écran), l'écran passe au minimum avec l'heure ; un toucher le rallume sans appuyer sur un bouton.</li>
+      <li><b>Logos</b> : dans la fiche d'un bouton, cherche un logo en ligne (Discord, Spotify, Twitch…) sous les icônes. Il est copié dans le bouton : il reste affiché sans connexion. Les logos d'une couleur prennent la couleur du bouton.</li>
       <li><b>Rocket League</b> : touche une case vide (+) en modification et choisis <b>Rocket League</b> (1 à 3 cases). Elle montre ta session (victoires, défaites, série) ; touche-la pour le détail. La session s'affiche aussi sur l'écran de veille. À activer une fois dans Stream Deck PC (carte Rocket League).</li>
       <li><b>Mixer</b> : bouton à curseurs en haut à droite (ou une case Mixer : touche une case vide (+) en modification et choisis <b>Mixer</b>). Elle ouvre le volume général et le volume de chaque appli du PC (Discord, Deezer, jeu…), avec un bouton muet chacune.</li>
       <li>Pour <b>déplacer</b> un bouton, fais-le glisser : sur une case vide il s'y pose, sur un autre bouton ils échangent leur place, sur un onglet il part dans cette page.</li>
@@ -1042,7 +1104,9 @@ document.addEventListener("click", async e => {
       else { delete draft.kind; delete draft.w; Object.assign(draft, { label: "Nouveau", color: "sound", icon: "star", keys: ["ctrl", "shift", "f21"] }); }
       drawEditor(); return; }
     const sz = t.closest("[data-size]"); if (sz) { draft.w = +sz.dataset.size; drawEditor(); return; }
-    const ic = t.closest("[data-icon]"); if (ic) { readDraft(); draft.icon = ic.dataset.icon; drawEditor(); return; }
+    const ic = t.closest("[data-icon]"); if (ic) { readDraft(); draft.icon = ic.dataset.icon; delete draft.svg; drawEditor(); return; }
+    const lg = t.closest("[data-logo]"); if (lg) { pickLogo(lg.dataset.logo); return; }
+    const lq = t.closest("[data-logoq]"); if (lq) { const inp = $("#logoQ"); if (inp) inp.value = lq.dataset.logoq; searchLogos(lq.dataset.logoq); return; }
     const kd = t.closest("[data-kind]"); if (kd) { readDraft(); draft.keys = kd.dataset.kind === "media" ? ["media_play_pause"] : ["ctrl", "shift", "f21"]; drawEditor(); return; }
     const md = t.closest("[data-media]"); if (md) { readDraft(); draft.keys = [md.dataset.media]; drawEditor(); return; }
     const mo = t.closest("[data-mod]"); if (mo) { readDraft(); const m = mo.dataset.mod; const mods = new Set(draft.keys.filter(x => KEYNAME[x])); mods.has(m) ? mods.delete(m) : mods.add(m); const main = draft.keys.find(x => !KEYNAME[x]); draft.keys = ["ctrl", "alt", "shift"].filter(x => mods.has(x)).concat(main); drawEditor(); return; }
