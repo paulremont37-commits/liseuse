@@ -1,0 +1,1303 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#000000">
+<title>Stream Deck</title>
+<style>
+@font-face{font-family:'Bricolage Grotesque';src:url(fonts/bricolage-grotesque-latin-800-normal.woff2) format('woff2');font-weight:800;font-display:swap}
+@font-face{font-family:'Inter';src:url(fonts/inter-latin-500-normal.woff2) format('woff2');font-weight:500;font-display:swap}
+@font-face{font-family:'Inter';src:url(fonts/inter-latin-600-normal.woff2) format('woff2');font-weight:600;font-display:swap}
+@font-face{font-family:'Inter';src:url(fonts/inter-latin-700-normal.woff2) format('woff2');font-weight:700;font-display:swap}
+/* Console de jeu : fond ardoise, une couleur par famille de boutons (voix, sons, clip, musique), grille qui remplit l'écran */
+:root{
+  --bg:#000; --panel:#08080c; --panel-2:#111118; --line:#1e1e2a; --fg:#f4f6ff; --muted:#7d8094;
+  --voice:#8a6bff; --mod:#00ffa3; --sound:#ffc21a; --clip:#ff2d6b; --music:#00e5ff; --plain:#c8cede; --pink:#ff3ccf; --lime:#b8ff2e;
+  --ok:#00ffa3; --bad:#ff2d6b;
+  --f-display:'Bricolage Grotesque','Inter',system-ui,sans-serif;
+  --f-ui:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-ui);font-size:15px;overflow:hidden;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;padding:env(safe-area-inset-top,0px) max(14px,env(safe-area-inset-right,0px)) env(safe-area-inset-bottom,0px) max(14px,env(safe-area-inset-left,0px))}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--sound);outline-offset:2px}
+[hidden]{display:none!important}
+
+.shell{height:100%;display:flex;flex-direction:column;gap:12px;padding-block:12px}
+.bar{display:flex;align-items:center;gap:10px;min-height:48px}
+.status{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:999px;height:44px;padding:0 16px 0 12px;font-weight:600;min-width:0;max-width:40%}
+.status span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dot{width:12px;height:12px;border-radius:50%;background:var(--muted);flex:none;box-shadow:0 0 0 4px color-mix(in srgb,var(--muted) 20%,transparent)}
+.status.on .dot{background:var(--ok);box-shadow:0 0 0 4px color-mix(in srgb,var(--ok) 22%,transparent)}
+.status.wait .dot{background:var(--sound);animation:blink 1s 8}
+.status.err .dot{background:var(--bad)}
+@keyframes blink{50%{opacity:.35}}
+.tabs{flex:1;display:flex;justify-content:center;gap:6px;min-width:0;overflow-x:auto;scrollbar-width:none}
+.tab{height:44px;border-radius:12px;border:0;background:none;padding:0 18px;font-weight:700;color:var(--muted);white-space:nowrap}
+.tab[aria-current="true"]{background:var(--panel-2);color:var(--fg)}
+.clock{font-family:var(--f-display);font-weight:800;font-size:22px;letter-spacing:-.02em;font-variant-numeric:tabular-nums;padding:0 6px}
+.ib{width:48px;height:48px;border-radius:14px;border:1px solid var(--line);background:var(--panel);display:grid;place-items:center;flex:none}
+.ib svg{width:22px;height:22px}
+.ib[aria-pressed="true"]{background:var(--sound);color:#1b1205;border-color:transparent}
+
+.grid{flex:1;min-height:0;display:grid;gap:14px}
+.tile{position:relative;border-radius:24px;border:2px solid color-mix(in srgb,var(--c) 40%,var(--line));background:linear-gradient(180deg,color-mix(in srgb,var(--c) 16%,var(--panel)) 0%,var(--panel) 75%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:10px;min-width:0;min-height:0;overflow:hidden;touch-action:manipulation;transition:transform .08s ease,background .15s,border-color .15s}
+.tile svg{width:clamp(28px,34%,72px);height:auto;aspect-ratio:1;color:var(--c);flex:none}
+.tile .lbl{font-weight:700;font-size:clamp(13px,1.6vw,19px);line-height:1.15;text-align:center;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:anywhere}
+.tile .keys{position:absolute;bottom:8px;right:12px;font-size:11px;color:var(--muted);font-weight:600;opacity:0;transition:opacity .15s}
+.editing .tile .keys{opacity:1}
+.tile.down{transform:scale(.94)}
+.tile.on{background:color-mix(in srgb,var(--oc) 30%,var(--panel));border-color:var(--oc)}
+.tile.on svg{color:var(--oc)}
+.tile .flag{position:absolute;top:10px;left:50%;transform:translateX(-50%);font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:3px 9px;border-radius:99px;background:var(--oc);color:#12080a;display:none;white-space:nowrap}
+.tile.on .flag{display:block}
+.tile.ok::after,.tile.fail::after{content:"";position:absolute;inset:0;border-radius:22px;animation:flash .5s ease forwards}
+.tile.ok::after{box-shadow:inset 0 0 0 4px var(--ok)}
+.tile.fail::after{box-shadow:inset 0 0 0 4px var(--bad)}
+@keyframes flash{from{opacity:1}to{opacity:0}}
+.tile.add{border-style:dashed;background:none;--c:var(--muted)}
+.tile.ghost{visibility:hidden}
+/* widget musique */
+.tile.media{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto;align-items:center;justify-items:stretch;gap:10px 14px;padding:14px;text-align:left}
+.tile.media .mbg{position:absolute;inset:-20px;background:center/cover no-repeat;filter:blur(26px) saturate(1.4);opacity:.32;pointer-events:none}
+.tile.media > *{position:relative}
+.tile.media .mart{width:clamp(52px,7.5vw,96px);aspect-ratio:1;border-radius:14px;overflow:hidden;display:grid;place-items:center;background:color-mix(in srgb,var(--c) 10%,#000);border:1px solid color-mix(in srgb,var(--c) 40%,transparent);box-shadow:0 0 22px -8px var(--c);align-self:center}
+.tile.media .mart img{width:100%;height:100%;object-fit:cover;display:block}
+.tile.media .mart svg{width:44%;height:auto;color:var(--c);filter:drop-shadow(0 0 6px var(--c))}
+.tile.media .minfo{min-width:0;display:flex;flex-direction:column;gap:3px}
+.tile.media .mapp{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--c);text-shadow:0 0 8px color-mix(in srgb,var(--c) 70%,transparent)}
+.tile.media .mapp:empty{display:none}
+.tile.media .mt{font-family:var(--f-display);font-weight:800;font-size:clamp(15px,1.9vw,24px);line-height:1.12;letter-spacing:-.01em;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:anywhere}
+.tile.media .ma{color:var(--muted);font-weight:600;font-size:clamp(12px,1.3vw,15px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile.media .mbar{height:4px;border-radius:3px;background:rgba(255,255,255,.12);margin-top:8px;overflow:hidden}
+.tile.media .mbar i{display:block;height:100%;width:0;background:var(--c);box-shadow:0 0 10px var(--c);border-radius:3px;transition:width .5s linear}
+.tile.media .mctl{grid-column:1 / -1;display:flex;justify-content:center;gap:clamp(6px,2vw,22px)}
+.tile.media .mctl button{width:clamp(40px,4.6vw,56px);height:clamp(40px,4.6vw,56px);border-radius:50%;border:1.5px solid color-mix(in srgb,var(--c) 55%,transparent);background:#000;color:var(--fg);display:grid;place-items:center;transition:transform .08s,box-shadow .15s}
+.tile.media .mctl button svg{width:44%;height:44%}
+.tile.media .mctl .pp{border-color:var(--c);color:var(--c);box-shadow:0 0 16px -4px var(--c)}
+.tile.media .mctl button.down{transform:scale(.88);box-shadow:0 0 22px -2px var(--c)}
+.tile.media.wide{grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto;align-content:center;padding:14px 22px;column-gap:20px;row-gap:10px}
+.tile.media.wide .mart{grid-row:1 / span 2;width:clamp(64px,10vw,140px);max-height:100%}
+.tile.media.wide .mt{-webkit-line-clamp:1}
+.tile.media.wide .mctl{grid-column:2;justify-content:flex-start}
+.tile.media.wide .mctl button{width:clamp(36px,3.8vw,50px);height:clamp(36px,3.8vw,50px)}
+.tile.media{align-content:center}
+.tile.media:not(.wide) .mart{grid-row:1}
+.tile.media.idle .mt{color:var(--muted)}
+.tile.media.idle .mctl button{opacity:.45}
+.tile.media.playing .mart{box-shadow:0 0 28px -6px var(--c)}
+.tile.media.w3{padding:16px 26px;column-gap:26px}
+.tile.media.w3 .mart{width:clamp(72px,13vw,190px)}
+.tile.media.w3 .mt{-webkit-line-clamp:2;font-size:clamp(17px,2.3vw,30px)}
+.tile.media.w3 .ma{font-size:clamp(13px,1.5vw,18px)}
+.tile.media.w3 .mctl button{width:clamp(40px,4.4vw,58px);height:clamp(40px,4.4vw,58px)}
+.tile.mixertile .keys{opacity:1}
+.sheet.mixer{width:min(900px,100%);padding:20px 22px 24px}
+.mxhead{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.mxhead h2{display:flex;align-items:center;gap:10px;margin:0}.mxhead h2 svg{width:26px;height:26px;color:var(--mod);filter:drop-shadow(0 0 6px var(--mod))}
+.mxpc{color:var(--muted);font-weight:600;margin-right:auto}
+.mxh{margin:18px 0 6px}
+.mxnote{color:var(--muted);line-height:1.5;margin:14px 0}
+.mrow{display:grid;grid-template-columns:44px minmax(90px,170px) minmax(0,1fr) 40px 52px;align-items:center;gap:14px;padding:8px 0;border-top:1px solid var(--line)}
+.mrow.big{border-top:0;padding:6px 0 14px}
+.mbadge{width:44px;height:44px;border-radius:13px;display:grid;place-items:center;font-family:var(--f-display);font-weight:800;font-size:20px;color:var(--c);border:1.5px solid color-mix(in srgb,var(--c) 60%,transparent);box-shadow:0 0 14px -4px var(--c),inset 0 0 12px -6px var(--c);text-shadow:0 0 8px var(--c)}
+.mbadge svg{width:22px;height:22px}
+.mname{min-width:0}.mname b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.mname small{color:var(--muted);font-size:12.5px}
+.mval{font-variant-numeric:tabular-nums;font-weight:700;text-align:right;color:var(--c)}
+.mrow input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:48px;background:transparent;margin:0;touch-action:none}
+.mrow input[type=range]::-webkit-slider-runnable-track{height:8px;border-radius:5px;background:linear-gradient(90deg,var(--c) 0 var(--p),rgba(255,255,255,.12) var(--p) 100%);box-shadow:0 0 12px -3px var(--c)}
+.mrow input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:30px;height:30px;margin-top:-11px;border-radius:50%;background:#000;border:3px solid var(--c);box-shadow:0 0 14px var(--c)}
+.mrow input[type=range]::-moz-range-track{height:8px;border-radius:5px;background:linear-gradient(90deg,var(--c) 0 var(--p),rgba(255,255,255,.12) var(--p) 100%)}
+.mrow input[type=range]::-moz-range-thumb{width:26px;height:26px;border-radius:50%;background:#000;border:3px solid var(--c)}
+.mmute{width:52px;height:46px;border-radius:13px;border:1px solid var(--line);background:#0b0b11;display:grid;place-items:center;color:var(--fg)}
+.mmute svg{width:22px;height:22px}
+.mmute[aria-pressed="true"]{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 60%,transparent);box-shadow:0 0 14px -4px var(--bad)}
+.mrow.muted input[type=range]{opacity:.35}.mrow.muted .mval{color:var(--muted)}
+.mrow.big .mname b{font-size:17px}
+@media (max-width:640px){.mrow{grid-template-columns:40px minmax(0,1fr) 46px;grid-template-areas:"b n m" "r r v"}.mbadge{grid-area:b;width:40px;height:40px}.mname{grid-area:n}.mmute{grid-area:m;width:46px}.mrow input[type=range]{grid-area:r}.mval{grid-area:v}}
+.bat{display:flex;align-items:center;gap:7px;font-weight:700;font-size:14px;color:var(--fg);font-variant-numeric:tabular-nums;--bc:var(--ok)}
+.bat .bshape{position:relative;width:30px;height:15px;border:2px solid var(--bc);border-radius:4px;padding:1.5px;box-shadow:0 0 8px -2px var(--bc)}
+.bat .bshape::after{content:"";position:absolute;right:-5px;top:3px;width:3px;height:5px;border-radius:0 2px 2px 0;background:var(--bc)}
+.bat .bshape i{display:block;height:100%;border-radius:2px;background:var(--bc);box-shadow:0 0 6px var(--bc)}
+.bat.mid{--bc:var(--sound)}.bat.low{--bc:var(--bad)}.bat.chg{--bc:var(--music)}
+.bat.chg b::before{content:"⚡";margin-right:2px;color:var(--music)}
+@media (max-width:640px){.bat b{display:none}}
+#sleep{position:fixed;inset:0;z-index:100;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#3a3d4f;touch-action:none}
+#sleep .sclock{font-family:var(--f-display);font-weight:800;font-size:clamp(64px,14vw,180px);letter-spacing:-.02em;color:color-mix(in srgb,var(--music) 45%,#000)}
+#sleep .sbat{font-weight:700;font-size:22px;color:#4a4d60}
+#sleep p{margin:16px 0 0;font-size:14px}
+body.asleep *,body.asleep *::before,body.asleep *::after{animation:none!important;transition:none!important}
+.tile.rltile{align-items:stretch;justify-content:space-between;gap:8px;padding:14px 16px;text-align:left}
+.rlh{display:flex;align-items:center;gap:8px;font-size:11.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--c);text-shadow:0 0 8px color-mix(in srgb,var(--c) 70%,transparent)}
+.rlh svg{width:20px!important;height:20px;flex:none}
+.rlh small{margin-left:auto;color:var(--ok);letter-spacing:.06em;text-shadow:0 0 8px var(--ok)}
+.rlbody{display:flex;flex-direction:column;gap:7px;min-width:0}
+.tile.rltile.wide .rlbody{flex-direction:row;flex-wrap:wrap;align-items:center;column-gap:16px}
+.rlwl{display:flex;gap:12px;font-family:var(--f-display);font-weight:800;font-size:clamp(20px,2.6vw,34px);letter-spacing:.01em;line-height:1}
+.rlwl .w,.rlmodes .w,#sleep .w{color:var(--ok);text-shadow:0 0 14px color-mix(in srgb,var(--ok) 55%,transparent)}
+.rlwl .l,.rlmodes .l,#sleep .l{color:var(--bad);text-shadow:0 0 14px color-mix(in srgb,var(--bad) 55%,transparent)}
+.rls{align-self:flex-start;font-size:12.5px;font-weight:800;border-radius:8px;padding:3px 9px;border:1.5px solid}
+.rls.up{color:var(--ok);border-color:var(--ok);box-shadow:0 0 10px -3px var(--ok)}
+.rls.down{color:var(--bad);border-color:var(--bad);box-shadow:0 0 10px -3px var(--bad)}
+.rldots{display:flex;gap:5px;align-items:center}
+.rldots i{width:10px;height:10px;border-radius:50%;background:var(--muted)}
+.rldots i.w{background:var(--ok);box-shadow:0 0 6px var(--ok)}.rldots i.l{background:var(--bad);box-shadow:0 0 6px var(--bad)}
+.rltot{color:var(--muted);font-weight:600;font-size:13px;width:100%}
+.rlidle{color:var(--muted);font-weight:600;font-size:14px;line-height:1.35}
+.sheet.rlsheet{width:min(900px,100%)}
+.rlbig{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:6px 0 14px}
+.rlbig .rlwl{font-size:44px}
+.rlgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.rlstat{border:1px solid var(--line);border-radius:14px;padding:12px 14px;background:#06060a}
+.rlstat b{display:block;font-family:var(--f-display);font-weight:800;font-size:26px;color:var(--fg)}
+.rlstat span{color:var(--muted);font-size:12.5px}
+.rlmodes{display:flex;flex-wrap:wrap;gap:8px}
+.rlmodes div{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:12px;padding:8px 12px}
+.rlmodes span{font-weight:600}
+.rllast{display:flex;flex-direction:column}
+.rllast > div{display:grid;grid-template-columns:34px minmax(0,1fr) 110px 150px 56px;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--line)}
+.rllast .rr{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;font-weight:800;border:1.5px solid var(--muted);color:var(--muted)}
+.rllast .w .rr{border-color:var(--ok);color:var(--ok);box-shadow:0 0 10px -3px var(--ok)}
+.rllast .l .rr{border-color:var(--bad);color:var(--bad);box-shadow:0 0 10px -3px var(--bad)}
+.rllast .rm{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rllast .rs{font-variant-numeric:tabular-nums;font-weight:700}
+.rllast .rme,.rllast .rt{color:var(--muted);font-size:13px}
+@media (max-width:640px){.rlgrid{grid-template-columns:repeat(2,minmax(0,1fr))}.rllast > div{grid-template-columns:30px minmax(0,1fr) auto}.rllast .rme,.rllast .rt{display:none}}
+#sleep .srl{display:flex;align-items:center;gap:14px;font-family:var(--f-display);font-weight:800;font-size:24px;margin-top:6px;opacity:.75}
+#sleep .srl:empty{display:none}
+#sleep .srl > span:first-child{font-family:var(--f-ui);font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:#4a4d60}
+.hint-s{color:var(--muted);font-size:13px;margin:8px 0 0}
+.grid{will-change:transform}
+/* La grille gère elle-même les gestes : sans ça, Android « vole » le glissé pour faire défiler
+   et annule le swipe (pointercancel). */
+.grid,.grid *{touch-action:none}
+.editing .tile{touch-action:none}
+.tile.slot{border:2px dashed var(--line);background:none;box-shadow:none;--c:var(--muted);opacity:.55}
+.tile.slot svg{width:clamp(22px,22%,40px);filter:none}
+.dragmode .tile.slot{opacity:.9}
+.tile.lifted{opacity:.18;animation:none!important}
+.tile.dragging{position:fixed;z-index:40;margin:0;pointer-events:none;animation:none!important;border-color:var(--c);box-shadow:0 0 40px -4px var(--c),0 18px 40px rgba(0,0,0,.8),inset 0 0 40px -10px var(--c);transition:none}
+.tile.drop{border-style:solid;border-color:var(--music)!important;opacity:1;box-shadow:0 0 0 2px var(--music),0 0 26px -2px var(--music)!important}
+.tab.drop{color:var(--music);background:color-mix(in srgb,var(--music) 14%,transparent);box-shadow:0 0 16px -4px var(--music)}
+.editing .tile:not(.slot){animation:wob 1.6s ease-in-out infinite}
+.editing .tile:nth-child(2n){animation-delay:-.8s}
+@keyframes wob{50%{transform:rotate(.6deg)}}
+
+/* écran de connexion */
+.setup{flex:1;display:grid;place-items:center;overflow:auto}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:28px;padding:28px;width:min(680px,100%)}
+.card h1{font-family:var(--f-display);font-weight:800;font-size:34px;letter-spacing:-.035em;margin:0 0 8px}
+.card p{color:var(--muted);margin:0 0 18px;line-height:1.5}
+.steps{margin:0 0 22px;padding-left:22px;color:var(--muted);line-height:1.6}
+.steps b{color:var(--fg)}
+.row{display:flex;gap:12px;flex-wrap:wrap}
+.field{display:flex;flex-direction:column;gap:6px;flex:1 1 200px;min-width:0}
+.field span{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.field input,.field select{height:56px;border-radius:14px;border:1px solid var(--line);background:var(--panel-2);padding:0 16px;font-size:22px;font-weight:600;font-variant-numeric:tabular-nums;min-width:0;width:100%;user-select:text;-webkit-user-select:text}
+.err{color:var(--bad);font-weight:600;min-height:22px;margin:12px 0 0}
+.btn{height:52px;border-radius:14px;border:1px solid var(--line);background:var(--panel-2);padding:0 20px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap}
+.btn.primary{background:var(--sound);color:#1b1205;border-color:transparent}
+.btn.danger{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 45%,transparent);background:none}
+.btn.danger.solid{background:var(--bad);color:#1a0508}
+
+/* feuilles */
+.scrim{position:fixed;inset:0;z-index:20;background:rgba(5,7,10,.7);display:flex;align-items:center;justify-content:center;padding:16px}
+.sheet{background:var(--panel);border:1px solid var(--line);border-radius:26px;width:min(760px,100%);max-height:100%;overflow:auto;padding:22px}
+.sheet h2{font-family:var(--f-display);font-weight:800;font-size:26px;letter-spacing:-.03em;margin:0 0 14px}
+.sheet h3{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:18px 0 8px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{height:44px;min-width:44px;border-radius:12px;border:1px solid var(--line);background:var(--panel-2);padding:0 14px;font-weight:700;display:inline-flex;align-items:center;gap:8px}
+.chip[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+.chip{white-space:nowrap}
+.chip svg,.btn svg{width:18px;height:18px;flex:none}
+.sw{width:44px;height:44px;border-radius:50%;border:3px solid transparent;background:var(--c)}
+.sw[aria-pressed="true"]{border-color:var(--fg);box-shadow:0 0 0 3px var(--bg) inset}
+.icons{display:grid;grid-template-columns:repeat(auto-fill,minmax(56px,1fr));gap:8px}
+.icons button{height:56px;border-radius:12px;border:1px solid var(--line);background:var(--panel-2);display:grid;place-items:center}
+.icons button svg{width:26px;height:26px}
+.icons button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+.foot{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin-top:22px}
+.foot .left{margin-right:auto}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 0;border-top:1px solid var(--line)}
+.toggle-row small{display:block;color:var(--muted)}
+.switch{width:56px;height:32px;border-radius:16px;border:0;background:var(--panel-2);position:relative;flex:none}
+.switch::after{content:"";position:absolute;top:4px;left:4px;width:24px;height:24px;border-radius:50%;background:var(--muted);transition:transform .2s}
+.switch[aria-checked="true"]{background:color-mix(in srgb,var(--sound) 45%,var(--panel-2))}
+.switch[aria-checked="true"]::after{transform:translateX(24px);background:var(--sound)}
+.preview{display:inline-flex;align-items:center;gap:8px;font-weight:700;background:var(--panel-2);border-radius:10px;padding:8px 12px;margin-top:10px;font-variant-numeric:tabular-nums}
+.help{background:var(--panel-2);border-radius:16px;padding:14px 16px;color:var(--muted);line-height:1.55}
+.help b{color:var(--fg)}
+.help ol{margin:6px 0 0;padding-left:20px}
+.guide details{border-top:1px solid var(--line)}
+.guide details:first-of-type{border-top:0}
+.guide summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 0;font-weight:700;font-size:16px}
+.guide summary::-webkit-details-marker{display:none}
+.guide summary::after{content:"+";font-size:24px;line-height:1;color:var(--muted);transition:transform .2s}
+.guide details[open] summary::after{transform:rotate(45deg)}
+.guide .gbody{padding:0 0 18px;color:var(--muted);line-height:1.6}
+.guide .gbody b{color:var(--fg)}
+.guide ol,.guide ul{margin:6px 0 0;padding-left:22px}
+.guide li{margin:4px 0}
+.guide kbd{font-family:var(--f-ui);font-size:13px;font-weight:700;background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:var(--fg)}
+.confirm{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:color-mix(in srgb,var(--bad) 14%,transparent);border-radius:14px;padding:10px 12px;margin-top:12px}
+.confirm span{flex:1 1 200px;font-weight:600}
+.toasts{position:fixed;z-index:30;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;width:min(520px,calc(100% - 32px))}
+.toast{background:#262d38;border-radius:14px;padding:12px 16px;font-weight:600;box-shadow:0 10px 30px rgba(0,0,0,.4);text-align:center}
+/* ---------------- DA néon : fond noir, chaque bouton est un tube lumineux de sa couleur ---------------- */
+.status{background:#000;border-color:var(--line)}
+.status.on{border-color:color-mix(in srgb,var(--ok) 55%,transparent);box-shadow:0 0 16px -6px var(--ok)}
+.status.on .dot{box-shadow:0 0 10px var(--ok),0 0 0 4px color-mix(in srgb,var(--ok) 18%,transparent)}
+.status.err .dot{box-shadow:0 0 10px var(--bad)}
+.tab{color:var(--muted);letter-spacing:.02em;position:relative}
+.tab[aria-current="true"]{background:none;color:var(--fg);text-shadow:0 0 12px rgba(255,255,255,.55)}
+.tab[aria-current="true"]::after{content:"";position:absolute;left:18px;right:18px;bottom:6px;height:3px;border-radius:3px;background:var(--music);box-shadow:0 0 10px var(--music),0 0 20px var(--music)}
+.clock{color:var(--music);text-shadow:0 0 14px color-mix(in srgb,var(--music) 70%,transparent)}
+.ib{background:#000;border-color:var(--line)}
+.ib[aria-pressed="true"]{background:#000;color:var(--sound);border-color:var(--sound);box-shadow:0 0 14px -2px var(--sound),inset 0 0 12px -4px var(--sound)}
+.tile{background:#000;border:2px solid color-mix(in srgb,var(--c) 65%,transparent);
+  box-shadow:0 0 22px -8px var(--c),inset 0 0 26px -14px var(--c);transition:transform .08s ease,box-shadow .15s,border-color .15s,background .15s}
+.tile svg{filter:drop-shadow(0 0 6px color-mix(in srgb,var(--c) 80%,transparent))}
+.tile img.tico{width:clamp(28px,34%,72px);height:auto;aspect-ratio:1;object-fit:contain;flex:none;filter:drop-shadow(0 0 6px color-mix(in srgb,var(--c) 70%,transparent));pointer-events:none}
+.tile.on img.tico{filter:drop-shadow(0 0 10px var(--oc))}
+.icons button img{width:28px;height:28px;object-fit:contain;pointer-events:none}
+.icons button.cur{border-color:var(--music)}
+.icons button.cur.photo{padding:0;overflow:hidden}.icons button.cur.photo img{width:100%;height:100%;object-fit:cover}
+.photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;max-height:300px;overflow:auto;scrollbar-width:thin}
+.photos button{aspect-ratio:1;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:#0b0b11;padding:0}
+.photos img{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}
+.ltabs .chip{height:38px}
+/* image : même place qu'un pictogramme, en vignette arrondie au contour néon */
+.tile img.tico.tpic{object-fit:cover;border-radius:22%;border:2px solid color-mix(in srgb,var(--c) 75%,transparent);box-shadow:0 0 14px -3px var(--c);filter:none}
+.tile.on img.tico.tpic{border-color:var(--oc);box-shadow:0 0 18px -2px var(--oc)}
+.logos{margin-top:12px;display:flex;flex-direction:column;gap:10px}
+.lsearch{display:flex;gap:8px}
+.lsearch input{flex:1;min-width:0;height:44px;border-radius:12px;border:1px solid var(--line);background:#0b0b11;color:var(--fg);padding:0 14px;font:inherit}
+.lquick{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.lquick .chip{height:36px;font-size:13px;flex:none}
+.lres .icons{max-height:236px;overflow:auto;scrollbar-width:thin}
+.tile .lbl{color:var(--fg);text-shadow:0 0 10px color-mix(in srgb,var(--c) 45%,transparent)}
+.tile.down{transform:scale(.95);border-color:var(--c);box-shadow:0 0 34px -4px var(--c),inset 0 0 40px -10px var(--c)}
+.tile.on{background:color-mix(in srgb,var(--oc) 12%,#000);border-color:var(--oc);box-shadow:0 0 30px -4px var(--oc),0 0 70px -24px var(--oc),inset 0 0 36px -10px var(--oc)}
+.tile.on svg{filter:drop-shadow(0 0 10px var(--oc))}
+.tile .flag{background:#000;color:var(--oc);border:1.5px solid var(--oc);box-shadow:0 0 10px -2px var(--oc);text-shadow:0 0 8px var(--oc)}
+.tile.ok::after{box-shadow:inset 0 0 0 3px var(--ok),inset 0 0 30px -6px var(--ok)}
+.tile.fail::after{box-shadow:inset 0 0 0 3px var(--bad),inset 0 0 30px -6px var(--bad)}
+.tile.add{box-shadow:none;border-color:var(--line)}
+.tile.add svg{filter:none}
+.card,.sheet{background:#05050a;border-color:var(--line);box-shadow:0 0 0 1px rgba(255,255,255,.02),0 30px 80px -20px rgba(0,0,0,.9)}
+.sheet{border-top:2px solid var(--music);box-shadow:0 -6px 30px -14px var(--music),0 30px 80px -20px #000}
+.scrim{background:rgba(0,0,0,.78)}
+.btn,.chip,.field input,.field select,.icons button,.preview,.help{background:#0b0b11}
+.btn.primary{background:var(--sound);color:#140e00;box-shadow:0 0 18px -4px var(--sound)}
+.chip[aria-pressed="true"],.icons button[aria-pressed="true"]{background:#000;color:var(--music);border-color:var(--music);box-shadow:0 0 12px -3px var(--music),inset 0 0 10px -5px var(--music)}
+.sw{box-shadow:0 0 12px -3px var(--c)}
+.sw[aria-pressed="true"]{border-color:#fff;box-shadow:0 0 0 3px #000 inset,0 0 16px var(--c)}
+.switch[aria-checked="true"]::after{box-shadow:0 0 10px var(--sound)}
+.toast{background:#0b0b11;border:1px solid var(--line);box-shadow:0 0 24px -10px var(--music),0 10px 30px rgba(0,0,0,.6)}
+:focus-visible{outline-color:var(--music)}
+@media (max-width:640px){.clock{display:none}.status{max-width:none}.grid{gap:10px}.tile{border-radius:18px}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="shell">
+  <header class="bar">
+    <div class="status" id="status"><i class="dot"></i><span id="statusTxt">Hors ligne</span></div>
+    <nav class="tabs" id="tabs" aria-label="Pages"></nav>
+    <div class="bat" id="bat" hidden><span class="bshape"><i></i></span><b id="batTxt"></b></div>
+    <div class="clock" id="clock"></div>
+    <button class="ib" id="mixBtn" aria-label="Mixer : volume de chaque appli"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg></button>
+    <button class="ib" id="editBtn" aria-pressed="false" aria-label="Modifier les boutons"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/></svg></button>
+    <button class="ib" id="setBtn" aria-label="Réglages"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg></button>
+  </header>
+  <main class="grid" id="grid"></main>
+  <section class="setup" id="setup" hidden></section>
+</div>
+<div id="sheetRoot"></div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script>
+(() => {
+"use strict";
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const AND = window.Android || null;
+const call = (fn, ...a) => { try { return AND && AND[fn] ? AND[fn](...a) : null; } catch (e) { return null; } };
+const uid = () => Math.random().toString(36).slice(2, 10);
+function toast(m, ms = 2400) { const t = document.createElement("div"); t.className = "toast"; t.textContent = m; $("#toasts").appendChild(t); setTimeout(() => t.remove(), ms); }
+
+/* ---------------- icônes (génériques, aucune marque) ---------------- */
+const P = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const ICONS = {
+  mic: P('<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>'),
+  headset: P('<path d="M4 14v-2a8 8 0 0 1 16 0v2"/><rect x="3" y="14" width="4" height="6" rx="1.5"/><rect x="17" y="14" width="4" height="6" rx="1.5"/>'),
+  voice: P('<path d="M3 12h2M7 8v8M11 5v14M15 8v8M19 10v4M21 12h0"/>'),
+  mask: P('<path d="M4 6c3-1.5 13-1.5 16 0v5c0 5-3.5 9-8 9s-8-4-8-9z"/><path d="M8 11h2M14 11h2M9 15c2 1.5 4 1.5 6 0"/>'),
+  clip: P('<rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3"/><circle cx="9.5" cy="12" r="2" fill="currentColor"/>'),
+  stop: P('<rect x="6" y="6" width="12" height="12" rx="2"/>'),
+  sound: P('<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/>'),
+  horn: P('<path d="M3 10v4l11 5V5z"/><path d="M14 9h3a3 3 0 0 1 0 6h-3"/><path d="M6 14l1 5h3l-1-4.5"/>'),
+  laugh: P('<circle cx="12" cy="12" r="9"/><path d="M8 10h.01M16 10h.01M7.5 14a5 5 0 0 0 9 0z"/>'),
+  bolt: P('<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>'),
+  star: P('<path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.2l1-6.2L3 9.6l6.2-.9z"/>'),
+  trophy: P('<path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8 21h8M10 17h4"/>'),
+  car: P('<path d="M5 16l1.5-5a2 2 0 0 1 2-1.5h7a2 2 0 0 1 2 1.5L19 16"/><rect x="3" y="16" width="18" height="3" rx="1.5"/><circle cx="7" cy="19.5" r="1.5"/><circle cx="17" cy="19.5" r="1.5"/>'),
+  ball: P('<circle cx="12" cy="12" r="9"/><path d="M12 7l4 3-1.5 5h-5L8 10z"/>'),
+  playpause: P('<path d="M5 5v14l8-7z"/><path d="M16 6v12M20 6v12"/>'),
+  next: P('<path d="M5 5v14l9-7z"/><path d="M18 5v14"/>'),
+  prev: P('<path d="M19 5v14l-9-7z"/><path d="M6 5v14"/>'),
+  volup: P('<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M17 9v6M14 12h6"/>'),
+  voldown: P('<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M15 12h6"/>'),
+  volmute: P('<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 9l5 6M21 9l-5 6"/>'),
+  music: P('<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>'),
+  sliders: P('<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>'),
+  chat: P('<path d="M4 5h16v11H9l-5 4z"/>'),
+  camera: P('<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>'),
+  keyboard: P('<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/>')
+};
+const PLUS = P('<path d="M12 5v14M5 12h14"/>');
+const COLORS = { voice: "var(--voice)", mod: "var(--mod)", sound: "var(--sound)", clip: "var(--clip)", music: "var(--music)", pink: "var(--pink)", lime: "var(--lime)", plain: "var(--plain)" };
+const MEDIA = { media_play_pause: "Lecture / pause", media_next: "Morceau suivant", media_prev: "Morceau précédent", volume_up: "Volume +", volume_down: "Volume −", volume_mute: "Couper le son du PC" };
+const KEYNAME = { ctrl: "Ctrl", alt: "Alt", shift: "Maj", win: "Win" };
+const describe = k => k.map(x => KEYNAME[x] || MEDIA[x] || x.toUpperCase()).join(" + ");
+
+/* ---------------- boutons par défaut ---------------- */
+function defaults() {
+  const t = (label, icon, color, keys, extra = {}) => ({ id: uid(), label, icon, color, keys, ...extra });
+  const sounds = [["Son 1", "horn"], ["Son 2", "laugh"], ["Son 3", "bolt"], ["Son 4", "star"], ["Son 5", "trophy"], ["Son 6", "car"], ["Son 7", "ball"], ["Son 8", "sound"]];
+  return [
+    { id: uid(), name: "Jeu", tiles: [
+      t("Micro", "mic", "voice", ["ctrl", "alt", "f13"], { toggle: true, onLabel: "Coupé", onColor: "clip" }),
+      t("Casque", "headset", "voice", ["ctrl", "alt", "f14"], { toggle: true, onLabel: "Sourdine", onColor: "clip" }),
+      t("Voix", "mask", "mod", ["ctrl", "alt", "f15"], { toggle: true, onLabel: "Activée", onColor: "mod" }),
+      t("Clip", "clip", "clip", ["ctrl", "alt", "f16"]),
+      t("Stop sons", "stop", "sound", ["ctrl", "alt", "f17"]),
+      ...sounds.map(([l, i], k) => t(l, i, "sound", ["ctrl", "shift", "f" + (13 + k)])),
+      t("Lecture / pause", "playpause", "music", ["media_play_pause"]),
+      t("Suivant", "next", "music", ["media_next"])
+    ]},
+    { id: uid(), name: "Musique & PC", tiles: [
+      t("Précédent", "prev", "music", ["media_prev"]),
+      t("Lecture / pause", "playpause", "music", ["media_play_pause"]),
+      t("Suivant", "next", "music", ["media_next"]),
+      t("Volume −", "voldown", "plain", ["volume_down"]),
+      t("Volume +", "volup", "plain", ["volume_up"]),
+      t("Couper le PC", "volmute", "plain", ["volume_mute"], { toggle: true, onLabel: "Muet", onColor: "clip" })
+    ]}
+  ];
+}
+
+/* ---------------- état ---------------- */
+let st = { pc: null, code: "", cols: 5, pages: defaults(), page: 0, states: {}, seenHelp: false, sleep: 60 };
+try { const s = JSON.parse(localStorage.getItem("deck.v1") || "null"); if (s && Array.isArray(s.pages)) st = Object.assign(st, s); } catch (e) {}
+// Une page = une liste de cases ; null = case vide (les boutons gardent la place où on les a mis).
+const trimPages = () => st.pages.forEach(p => { p.tiles = p.tiles || []; while (p.tiles.length && !p.tiles[p.tiles.length - 1]) p.tiles.pop(); });
+const save = () => { trimPages(); try { localStorage.setItem("deck.v1", JSON.stringify(st)); } catch (e) {} };
+let editing = false;
+
+/* ---------------- connexion au PC ---------------- */
+// Sous Android, la coque gère la connexion (le navigateur intégré bloque ws:// depuis une page sécurisée).
+const nativeSocks = {};
+window.__deckWs = (id, ev, data) => { const s = nativeSocks[id]; if (!s) return; if (ev === "open") s.onopen && s.onopen(); else if (ev === "message") s.onmessage && s.onmessage({ data }); else { delete nativeSocks[id]; s.onclose && s.onclose({ reason: data }); } };
+let sockSeq = 1;
+function openSocket(url) {
+  if (AND && AND.wsConnect) {
+    const id = sockSeq++; const s = { readyState: 0, send: d => call("wsSend", id, d), close: () => { call("wsClose", id); delete nativeSocks[id]; } };
+    nativeSocks[id] = s; call("wsConnect", id, url); return s;
+  }
+  return new WebSocket(url);
+}
+const C = { ws: null, state: "off", name: "", retry: 0, timer: 0, pending: new Map(), seq: 1, lastErr: "", rtt: 0, pings: new Map() };
+function setStatus(state, txt) {
+  C.state = state; const el = $("#status"); el.className = "status " + ({ on: "on", wait: "wait", err: "err" }[state] || "");
+  $("#statusTxt").textContent = txt;
+  if (typeof paintMedia === "function") try { paintMedia(); } catch (e) {}
+}
+// Temps aller-retour tablette → PC, affiché à côté du nom du PC
+function noteRtt(ms) {
+  C.rtt = C.rtt ? Math.round(C.rtt * 0.6 + ms * 0.4) : Math.round(ms);
+  if (C.state === "on") $("#statusTxt").textContent = `${C.name} connecté · ${Math.max(1, C.rtt)} ms`;
+}
+function connect() {
+  clearTimeout(C.timer);
+  if (C.ws) { try { C.ws.onclose = null; C.ws.close(); } catch (e) {} C.ws = null; }
+  if (!st.pc) { setStatus("off", "Pas de PC"); return; }
+  setStatus("wait", "Connexion…");
+  let ws; try { ws = openSocket(`ws://${st.pc}:8765`); } catch (e) { return later(); }
+  C.ws = ws;
+  ws.onopen = () => ws.send(JSON.stringify({ type: "hello", code: st.code }));
+  ws.onmessage = ev => {
+    let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+    if (m.type === "ok") { C.retry = 0; C.name = m.name || "PC"; C.lastErr = ""; C.rtt = 0; setStatus("on", C.name + " connecté"); if (!$("#setup").hidden) showDeck(); ping(); }
+    else if (m.type === "pong") { const t0 = C.pings.get(m.id); if (t0) { C.pings.delete(m.id); noteRtt(performance.now() - t0); } }
+    else if (m.type === "error") { C.lastErr = m.reason || "refusé"; setStatus("err", "Code refusé"); if (!$("#setup").hidden) $("#setErr").textContent = "Le PC a refusé : " + C.lastErr + "."; ws.onclose = null; try { ws.close(); } catch (e) {} C.ws = null; }
+    else if (m.type === "result") { const p = C.pending.get(m.id); if (p) { C.pending.delete(m.id); p(m.ok, m.reason); } }
+    else if (m.type === "media") onMedia(m);
+    else if (m.type === "mixer") onMixer(m);
+    else if (m.type === "rl") onRl(m);
+  };
+  ws.onclose = () => { C.ws = null; if (C.state === "on") toast("Connexion au PC perdue. Nouvelle tentative…"); later(); };
+}
+function later() {
+  setStatus(C.lastErr ? "err" : "wait", C.lastErr ? "Code refusé" : "PC introuvable");
+  if (C.lastErr) return;
+  C.retry = Math.min(C.retry + 1, 5); C.timer = setTimeout(connect, [1500, 2000, 3000, 4000, 5000][C.retry - 1]);
+}
+function sendKeys(keys, label) {
+  return new Promise(res => {
+    if (C.state !== "on" || !C.ws) return res({ ok: false, reason: "PC non connecté" });
+    const id = C.seq++; const t0 = performance.now();
+    // Envoi en premier : rien ne doit passer avant le message
+    C.ws.send(JSON.stringify({ type: "press", id, keys, label }));
+    const t = setTimeout(() => { C.pending.delete(id); res({ ok: false, reason: "pas de réponse du PC" }); }, 2500);
+    C.pending.set(id, (ok, reason) => { clearTimeout(t); noteRtt(performance.now() - t0); res({ ok, reason }); });
+  });
+}
+function ping() {
+  if (C.state !== "on" || !C.ws) return;
+  const id = C.seq++; C.pings.set(id, performance.now()); if (C.pings.size > 20) C.pings.clear();
+  try { C.ws.send(JSON.stringify({ type: "ping", id })); } catch (e) {}
+}
+// Un petit message régulier garde la connexion (et le Wi-Fi) éveillés entre deux appuis
+let pingT = setInterval(ping, 5000);
+function pingEvery(ms) { clearInterval(pingT); pingT = setInterval(ping, ms); }
+document.addEventListener("visibilitychange", () => { if (!document.hidden && C.state !== "on" && st.pc) connect(); });
+
+/* ---------------- rendu ---------------- */
+function renderTabs() {
+  $("#tabs").innerHTML = st.pages.map((p, i) => `<button class="tab" data-page="${i}" aria-current="${i === st.page}">${esc(p.name)}</button>`).join("") +
+    (editing ? `<button class="tab" data-act="add-page">+ Page</button>` : "");
+}
+function tileHTML(t, span) {
+  if (t.kind === "media") return mediaHTML(t, span || 1);
+  if (t.kind === "rl") return rlHTML(t, span || 1);
+  if (t.kind === "mixer") return `<button class="tile mixertile" data-tile="${t.id}" style="--c:${COLORS[t.color] || COLORS.mod}">${ICONS.sliders}<span class="lbl">${esc(t.label || "Mixer")}</span><span class="keys">Volume par appli</span></button>`;
+  const on = t.toggle && st.states[t.id];
+  return `<button class="tile${on ? " on" : ""}" data-tile="${t.id}" style="--c:${COLORS[t.color] || COLORS.plain};--oc:${COLORS[t.onColor] || COLORS.clip}">
+    <span class="flag">${esc(t.onLabel || "Actif")}</span>${t.img ? `<img class="tico tpic" src="${t.img}" alt="">` : t.svg ? `<img class="tico" src="${logoSrc(t.svg, COLORS[t.color] || COLORS.plain)}" alt="">` : ICONS[t.icon] || ICONS.keyboard}<span class="lbl">${esc(t.label)}</span><span class="keys">${esc(describe(t.keys))}</span></button>`;
+}
+function pageLayout(n, edit) {
+  const page = st.pages[n] || st.pages[0];
+  const tiles = page.tiles;
+  const cols = Math.max(2, Math.min(innerWidth < 640 ? 3 : 8, st.cols));
+  // En modification, toujours au moins une case libre après le dernier bouton
+  const rows = Math.max(Math.ceil((tiles.length + (edit ? 1 : 0)) / cols), innerWidth < 640 ? 4 : 3);
+  const editing = edit;
+  const count = editing ? rows * cols : tiles.length;
+  let html = ""; const covered = new Set();
+  for (let i = 0; i < count; i++) {
+    if (covered.has(i)) continue;
+    const t = tiles[i];
+    // Widget large : prend aussi les cases de droite si elles sont libres et sur la même ligne
+    let span = 1;
+    if (t && (t.kind === "media" || t.kind === "rl") && t.w > 1) while (span < t.w && i % cols + span < cols && !tiles[i + span]) span++;
+    for (let k = 1; k < span; k++) covered.add(i + k);
+    html += t ? tileHTML(t, span) : editing ? `<button class="tile slot" data-slot="${i}" aria-label="Ajouter un bouton ici">${PLUS}</button>` : `<div class="tile ghost" aria-hidden="true"></div>`;
+  }
+  return { html, cols, rows };
+}
+function renderGrid() {
+  if (!st.pages[st.page]) st.page = 0;
+  trimPages();
+  const g = $("#grid"); const L = pageLayout(st.page, editing);
+  g.style.gridTemplateColumns = `repeat(${L.cols},minmax(0,1fr))`; g.style.gridTemplateRows = `repeat(${L.rows},minmax(0,1fr))`;
+  g.classList.toggle("editing", editing);
+  g.innerHTML = L.html;
+  paintMedia(); paintRl();
+}
+function render() { renderTabs(); renderGrid(); $("#editBtn").setAttribute("aria-pressed", String(editing)); }
+function showDeck() { $("#setup").hidden = true; $("#grid").hidden = false; render(); }
+function showSetup(msg) {
+  $("#grid").hidden = true; const s = $("#setup"); s.hidden = false;
+  s.innerHTML = `<div class="card">
+    <h1>Relier ton PC</h1>
+    <p>La tablette envoie les raccourcis à ton PC par le Wi-Fi. Les deux doivent être sur la même box.</p>
+    <ol class="steps"><li>Sur le PC, télécharge et lance <b>StreamDeckPC.exe</b> (page Releases du repo liseuse).</li><li>La fenêtre affiche une <b>adresse</b> et un <b>code</b>.</li><li>Tape-les ici.</li></ol>
+    <div class="row"><label class="field"><span>Adresse du PC</span><input id="pcIp" inputmode="decimal" placeholder="192.168.1.23" value="${esc(st.pc || "")}" autocomplete="off"></label>
+    <label class="field" style="flex:0 1 200px"><span>Code</span><input id="pcCode" inputmode="numeric" maxlength="6" placeholder="000000" value="${esc(st.code || "")}" autocomplete="off"></label></div>
+    <p class="err" id="setErr">${esc(msg || "")}</p>
+    <div class="foot"><button class="btn" data-act="guide" style="margin-right:auto">Guide</button>${st.pc ? `<button class="btn" data-act="cancel-setup">Annuler</button>` : ""}<button class="btn primary" data-act="save-pc">Connecter</button></div></div>`;
+}
+
+/* ---------------- widget « musique en cours » (ce qui joue sur le PC : Deezer, Spotify…) ---------------- */
+const M = { d: null, art: null, at: 0 };
+const NOTE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>';
+const MI = {
+  media_prev: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h2.4v14H6zM20 5.6v12.8L9.6 12z"/></svg>',
+  play: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.8v14.4L19.5 12z"/></svg>',
+  pause: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.5 5h4v14h-4zM13.5 5h4v14h-4z"/></svg>',
+  media_next: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.6 5H18v14h-2.4zM4 5.6v12.8L14.4 12z"/></svg>'
+};
+function mediaHTML(t, span) {
+  return `<div class="tile media${span > 1 ? " wide" : ""}${span > 2 ? " w3" : ""}" data-tile="${t.id}" role="group" aria-label="Musique en cours" style="--c:${COLORS[t.color] || COLORS.music}${span > 1 ? ";grid-column:span " + span : ""}">
+    <div class="mbg"></div><div class="mart">${NOTE}</div>
+    <div class="minfo"><small class="mapp"></small><b class="mt"></b><span class="ma"></span><div class="mbar"><i></i></div></div>
+    <div class="mctl"><button data-mkey="media_prev" aria-label="Morceau précédent">${MI.media_prev}</button><button class="pp" data-mkey="media_play_pause" aria-label="Lecture / pause">${MI.play}</button><button data-mkey="media_next" aria-label="Morceau suivant">${MI.media_next}</button></div>
+  </div>`;
+}
+function onMedia(m) {
+  if (m.art) M.art = m.art; else if (!m.artId) M.art = null;
+  M.d = m; M.at = performance.now(); paintMedia();
+}
+function mediaPos() {
+  const d = M.d; if (!d || !d.dur) return 0;
+  return Math.min(d.dur, d.pos + (d.playing ? (performance.now() - M.at) / 1000 : 0));
+}
+function paintMedia() {
+  const els = document.querySelectorAll(".tile.media"); if (!els.length) return;
+  const d = M.d, on = !!(d && d.active && C.state === "on");
+  els.forEach(el => {
+    el.classList.toggle("idle", !on); el.classList.toggle("playing", on && d.playing);
+    el.querySelector(".mt").textContent = on ? d.title : "Rien en lecture";
+    el.querySelector(".ma").textContent = on ? d.artist : C.state === "on" ? "Lance Deezer ou Spotify sur le PC" : "PC non connecté";
+    el.querySelector(".mapp").textContent = on ? d.app || "" : "";
+    const art = el.querySelector(".mart"), bg = el.querySelector(".mbg");
+    const src = on && M.art ? M.art : "";
+    if (art.dataset.src !== src) {
+      art.dataset.src = src;
+      art.innerHTML = src ? `<img src="${src}" alt="">` : NOTE;
+      bg.style.backgroundImage = src ? `url("${src}")` : "";
+    }
+    const pp = el.querySelector(".pp"); const want = on && d.playing ? "pause" : "play";
+    if (pp.dataset.s !== want) { pp.dataset.s = want; pp.innerHTML = MI[want]; }
+    const bar = el.querySelector(".mbar"); bar.hidden = !(on && d.dur);
+    if (on && d.dur) bar.firstChild.style.width = (100 * mediaPos() / d.dur).toFixed(2) + "%";
+  });
+}
+setInterval(() => { if (M.d && M.d.playing && !asleep) paintMedia(); }, 500);
+
+/* ---------------- Rocket League : session (victoires, défaites, série, stats) ---------------- */
+const RLICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 15h4l2-4h6l3 4h3v3H3z"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/><path d="M9 11 10.5 7h4"/></svg>';
+const RL = { d: null };
+function onRl(m) { RL.d = m; paintRl(); if ($("#rlPanel")) drawRl(); }
+function rlIdle(d) {
+  if (C.state !== "on") return "PC non connecté";
+  if (!d) return "Mets à jour Stream Deck PC";
+  if (d.status === "nogame") return "Rocket League introuvable sur le PC";
+  if (d.status === "off") return "Active les stats dans Stream Deck PC";
+  if (!d.connected && !d.n) return "Lance Rocket League sur le PC";
+  return "";
+}
+const rlDots = (d, n) => (d.last || []).slice(0, n).reverse().map(r => `<i class="${r.win === true ? "w" : r.win === false ? "l" : "u"}"></i>`).join("");
+const rlStreak = d => d.streak > 0 ? `<span class="rls up">Série ${d.streak} V</span>` : d.streak < 0 ? `<span class="rls down">Série ${-d.streak} D</span>` : "";
+function rlHTML(t, span) {
+  return `<button class="tile rltile${span > 1 ? " wide" : ""}${span > 2 ? " w3" : ""}" data-tile="${t.id}" aria-label="Session Rocket League" style="--c:${COLORS[t.color] || COLORS.music}${span > 1 ? ";grid-column:span " + span : ""}">
+    <span class="rlh">${RLICON}<span>Rocket League</span><small class="rlon"></small></span><div class="rlbody"></div></button>`;
+}
+function paintRl() {
+  const d = RL.d, idle = rlIdle(d);
+  document.querySelectorAll(".tile.rltile").forEach(el => {
+    el.querySelector(".rlon").textContent = d && d.connected ? "en jeu" : "";
+    const wide = el.classList.contains("wide");
+    el.querySelector(".rlbody").innerHTML = idle ? `<span class="rlidle">${esc(idle)}</span>` :
+      `<span class="rlwl"><b class="w">${d.w} V</b><b class="l">${d.l} D</b></span>${rlStreak(d)}
+       ${d.n ? `<span class="rldots">${rlDots(d, wide ? 10 : 6)}</span>` : `<span class="rlidle">Aucun match en ligne pour l'instant</span>`}
+       ${wide && d.n ? `<span class="rltot">${d.tot.goals} buts · ${d.tot.assists} passes · ${d.tot.saves} arrêts</span>` : ""}`;
+  });
+  const sr = document.getElementById("sleepRl");
+  if (sr) sr.innerHTML = d && d.n ? `<span>Rocket League</span><b class="w">${d.w} V</b><b class="l">${d.l} D</b>${rlStreak(d)}<span class="rldots">${rlDots(d, 10)}</span>` : "";
+}
+function openRl() {
+  $("#sheetRoot").innerHTML = `<div class="scrim" data-act="scrim"><div class="sheet rlsheet" role="dialog" aria-modal="true" id="rlPanel"><div id="rlIn"></div></div></div>`;
+  drawRl();
+  if (C.state === "on" && C.ws) try { C.ws.send(JSON.stringify({ type: "rl_get" })); } catch (e) {}
+}
+function drawRl(confirmReset) {
+  const d = RL.d, idle = rlIdle(d), box = $("#rlIn"); if (!box) return;
+  const head = `<div class="mxhead"><h2>${RLICON} Rocket League</h2><span class="mxpc">${d && d.connected ? "en jeu" : "session"}${d && d.started ? " · depuis " + new Date(d.started * 1000).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : ""}</span><button class="btn" data-act="close">Fermer</button></div>`;
+  if (idle || !d) { box.innerHTML = head + `<p class="mxnote">${esc(idle || "Chargement…")}</p>`; return; }
+  const n = d.n || 0, pct = d.w + d.l ? Math.round(100 * d.w / (d.w + d.l)) : 0;
+  const avg = k => n ? (d.tot[k] / n).toFixed(1).replace(".", ",") : "0";
+  const stat = (v, l, cls = "") => `<div class="rlstat ${cls}"><b>${v}</b><span>${l}</span></div>`;
+  box.innerHTML = head + `
+    <div class="rlbig"><span class="rlwl"><b class="w">${d.w} V</b><b class="l">${d.l} D</b></span>${rlStreak(d)}<span class="rldots">${rlDots(d, 12)}</span></div>
+    <div class="rlgrid">${stat(n, "matchs")}${stat(pct + " %", "victoires")}${stat(d.tot.goals, "buts · " + avg("goals") + "/match")}${stat(d.tot.assists, "passes · " + avg("assists") + "/match")}${stat(d.tot.saves, "arrêts · " + avg("saves") + "/match")}${stat(d.tot.shots, "tirs")}${stat(d.tot.demos, "démos")}${stat(d.tot.score, "points")}</div>
+    ${d.modes.length ? `<h3 class="mxh">Par mode</h3><div class="rlmodes">${d.modes.map(m => `<div><span>${esc(m.mode)}</span><b class="w">${m.w} V</b><b class="l">${m.l} D</b></div>`).join("")}</div>` : ""}
+    ${(d.last || []).length ? `<h3 class="mxh">Derniers matchs</h3><div class="rllast">${d.last.map(r => `<div class="${r.win === true ? "w" : r.win === false ? "l" : ""}">
+        <span class="rr">${r.win === true ? "V" : r.win === false ? "D" : "?"}</span><span class="rm">${esc(r.mode)}</span>
+        <span class="rs">${r.us != null ? r.us + " – " + r.them + (r.ot ? " (prol.)" : "") : ""}</span>
+        <span class="rme">${r.me ? `${r.me.goals} B · ${r.me.assists} P · ${r.me.saves} A` : ""}</span>
+        <span class="rt">${new Date(r.t * 1000).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</span></div>`).join("")}</div>` : `<p class="mxnote">Aucun match en ligne terminé pour l'instant. L'entraînement et les parties hors ligne ne comptent pas.</p>`}
+    <p class="mxnote">${d.me ? `Joueur suivi : <b>${esc(d.me)}</b> (${esc(d.meHow)}, modifiable dans Stream Deck PC).` : "Ton pseudo sera détecté au premier match."} Le jeu ne transmet pas le MMR.</p>
+    ${confirmReset ? `<div class="confirm"><span>Remettre la session à zéro ?</span><button class="btn" data-act="rl-keep">Annuler</button><button class="btn danger solid" data-act="rl-reset-yes">Remettre à zéro</button></div>` : `<div class="foot"><button class="btn danger left" data-act="rl-reset">Remettre à zéro</button></div>`}`;
+}
+
+/* ---------------- mixer : volume de chaque appli du PC ---------------- */
+const MX = { data: null, timer: 0, wait: 0, drag: null, sent: 0, pend: null };
+const MIXCOL = { discord: "voice", deezer: "pink", spotify: "mod", rocketleague: "music", chrome: "sound", msedge: "music", firefox: "clip",
+  voicemod: "lime", voicemoddesktop: "lime", medal: "clip", steam: "plain", steamwebhelper: "plain", system: "plain" };
+const VOL = { on: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg>',
+  off: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="m23 9-6 6M17 9l6 6"/></svg>' };
+function mixSend(o) { if (C.state !== "on" || !C.ws) return false; try { C.ws.send(JSON.stringify(o)); return true; } catch (e) { return false; } }
+function openMixer() {
+  $("#sheetRoot").innerHTML = `<div class="scrim" data-act="scrim"><div class="sheet mixer" role="dialog" aria-modal="true" id="mixerPanel">
+    <div class="mxhead"><h2>${ICONS.sliders} Mixer</h2><span class="mxpc">${esc(C.state === "on" ? C.name : "PC non connecté")}</span><button class="btn" data-act="close">Fermer</button></div>
+    <div id="mxBody"><p class="mxnote">${C.state === "on" ? "Chargement…" : "Relie d'abord le PC (Stream Deck PC ouvert, même Wi-Fi)."}</p></div>
+  </div></div>`;
+  MX.data = null;
+  if (C.state !== "on") return;
+  mixSend({ type: "mixer_get" });
+  clearInterval(MX.timer); clearTimeout(MX.wait);
+  MX.wait = setTimeout(() => { if (!MX.data && $("#mxBody")) $("#mxBody").innerHTML = `<p class="mxnote">Le PC ne répond pas au mixer : mets à jour <b>Stream Deck PC</b> sur le PC.</p>`; }, 2500);
+  MX.timer = setInterval(() => {
+    if (!$("#mixerPanel")) { clearInterval(MX.timer); return; }
+    if (!MX.drag) mixSend({ type: "mixer_get" });
+  }, 1000);
+}
+function mixRow(id, name, vol, mute, sub, big) {
+  const c = COLORS[MIXCOL[id]] || `hsl(${[...id].reduce((h, ch) => h + ch.charCodeAt(0) * 7, 0) % 360} 90% 62%)`;
+  return `<div class="mrow${big ? " big" : ""}${mute ? " muted" : ""}" data-mid="${esc(id)}" style="--c:${c}">
+    <span class="mbadge">${big ? VOL.on : esc(name.slice(0, 1).toUpperCase())}</span>
+    <div class="mname"><b>${esc(name)}</b><small>${esc(sub)}</small></div>
+    <input type="range" min="0" max="100" step="1" value="${vol}" data-mvol="${esc(id)}" aria-label="Volume ${esc(name)}" style="--p:${vol}%">
+    <span class="mval">${vol}</span>
+    <button class="mmute" data-mmute="${esc(id)}" aria-pressed="${mute}" aria-label="${mute ? "Réactiver" : "Couper"} ${esc(name)}">${mute ? VOL.off : VOL.on}</button>
+  </div>`;
+}
+function onMixer(m) {
+  clearTimeout(MX.wait);
+  const body = $("#mxBody"); if (!body) return;
+  if (!m.ok) { body.innerHTML = `<p class="mxnote">Mixer indisponible sur le PC : ${esc(m.reason || "erreur")}.</p>`; return; }
+  const ids = [m.master ? "master" : "", ...m.apps.map(a => a.id)].join("|");
+  MX.data = m;
+  if (body.dataset.ids !== ids) {
+    body.dataset.ids = ids;
+    body.innerHTML = (m.master ? mixRow("master", "Volume général", m.master.vol, m.master.mute, "Tout le PC", true) : `<p class="mxnote">Aucune sortie son par défaut trouvée sur le PC.</p>`) +
+      (m.apps.length ? `<h3 class="mxh">Applis</h3>` + m.apps.map(a => mixRow(a.id, a.name, a.vol, a.mute, a.active ? "joue du son" : "silencieuse", false)).join("")
+        : `<p class="mxnote">Aucune appli n'utilise le son pour l'instant. Lance Discord, Deezer ou un jeu : elle apparaîtra ici.</p>`);
+    return;
+  }
+  // mise à jour sur place (sans toucher au curseur qu'on est en train de glisser)
+  const upd = (id, vol, mute, sub) => {
+    const row = body.querySelector(`.mrow[data-mid="${CSS.escape(id)}"]`); if (!row) return;
+    const r = row.querySelector("input");
+    if (MX.drag !== id) { r.value = vol; r.style.setProperty("--p", vol + "%"); row.querySelector(".mval").textContent = vol; }
+    row.classList.toggle("muted", mute);
+    const b = row.querySelector(".mmute"); b.setAttribute("aria-pressed", String(mute)); b.innerHTML = mute ? VOL.off : VOL.on;
+    if (sub != null) row.querySelector("small").textContent = sub;
+  };
+  if (m.master) upd("master", m.master.vol, m.master.mute, null);
+  m.apps.forEach(a => upd(a.id, a.vol, a.mute, a.active ? "joue du son" : "silencieuse"));
+}
+document.addEventListener("input", e => {
+  const r = e.target.closest && e.target.closest("[data-mvol]"); if (!r) return;
+  const id = r.dataset.mvol, v = +r.value;
+  MX.drag = id; r.style.setProperty("--p", v + "%");
+  const row = r.closest(".mrow"); row.querySelector(".mval").textContent = v;
+  // au plus un message toutes les 50 ms pendant qu'on glisse
+  MX.pend = { type: "mixer_set", id, vol: v };
+  const now = performance.now();
+  if (now - MX.sent > 50) { MX.sent = now; mixSend(MX.pend); MX.pend = null; }
+  else { clearTimeout(MX.flush); MX.flush = setTimeout(() => { if (MX.pend) { MX.sent = performance.now(); mixSend(MX.pend); MX.pend = null; } }, 60); }
+});
+document.addEventListener("change", e => {
+  const r = e.target.closest && e.target.closest("[data-mvol]"); if (!r) return;
+  clearTimeout(MX.flush); MX.pend = null;
+  mixSend({ type: "mixer_set", id: r.dataset.mvol, vol: +r.value, reply: true });
+  setTimeout(() => { MX.drag = null; }, 300);
+});
+document.addEventListener("click", e => {
+  const b = e.target.closest && e.target.closest("[data-mmute]"); if (!b) return;
+  const mute = b.getAttribute("aria-pressed") !== "true";
+  b.setAttribute("aria-pressed", String(mute)); b.innerHTML = mute ? VOL.off : VOL.on; b.closest(".mrow").classList.toggle("muted", mute);
+  mixSend({ type: "mixer_set", id: b.dataset.mmute, mute, reply: true });
+  try { navigator.vibrate && navigator.vibrate(8); } catch (x) {}
+});
+
+/* ---------------- appuis ---------------- */
+const grid = $("#grid");
+// Le raccourci part dès que le doigt touche le bouton (pas au relâchement) : on gagne le temps d'appui.
+// Hors modification : un toucher sans glisser = appui (envoyé au relâchement), un glissé horizontal = page suivante/précédente.
+let gest = null, swallowClick = false;
+document.addEventListener("pointerdown", e => {
+  if (editing || gest || SW.busy || $("#sheetRoot").innerHTML) return;
+  if (!e.target.closest("#grid") || !$("#setup").hidden) return;
+  if (e.pointerType === "mouse" && e.button !== 0) return;
+  const el = e.target.closest("#grid .tile[data-tile]");
+  const mk = e.target.closest("[data-mkey]");
+  gest = { pid: e.pointerId, x0: e.clientX, y0: e.clientY, t0: performance.now(), el, mk, swipe: false, dead: false, dx: 0, pts: [[performance.now(), e.clientX]] };
+  if (mk) mk.classList.add("down"); else if (el) el.classList.add("down");
+}, true);
+addEventListener("pointermove", e => {
+  const g = gest; if (!g || e.pointerId !== g.pid) return;
+  const dx = e.clientX - g.x0, dy = e.clientY - g.y0;
+  g.dx = dx; const now = performance.now(); g.pts.push([now, e.clientX]); while (g.pts.length > 2 && now - g.pts[0][0] > 120) g.pts.shift();
+  if (!g.swipe && !g.dead) {
+    if (Math.abs(dx) > 22 && Math.abs(dx) > Math.abs(dy) * 1.3 && st.pages.length > 1) {
+      g.swipe = true; unpress(g); grid.style.transition = "none"; SW.measure();
+    } else if (Math.hypot(dx, dy) > 28) { g.dead = true; unpress(g); }
+  }
+  if (g.swipe) {
+    const n = st.page + (dx < 0 ? 1 : -1);
+    const has = n >= 0 && n < st.pages.length;
+    if (has) ensureGhost(n); else dropGhost();
+    setX(has ? dx : dx * 0.25);
+  }
+}, { passive: true });
+function unpress(g) { if (g.el) g.el.classList.remove("down"); if (g.mk) g.mk.classList.remove("down"); }
+addEventListener("pointerup", e => {
+  const g = gest; if (!g || e.pointerId !== g.pid) return;
+  gest = null; unpress(g);
+  const dx = e.clientX - g.x0, dt = performance.now() - g.t0;
+  if (g.swipe) { endSwipe(g, dx); return; }
+  if (g.dead || !g.el) return;
+  const t = findTile(g.el.dataset.tile); if (!t) return;
+  if (t.kind === "media") { mediaPress(g.mk ? g.mk.dataset.mkey : "media_play_pause", g.mk || g.el); return; }
+  if (t.kind === "rl") { swallowClick = true; setTimeout(() => { swallowClick = false; }, 500); openRl(); return; }
+  if (t.kind === "mixer") {
+    // Au doigt, Android envoie un « clic » juste après le relâchement : il tomberait sur le fond du panneau
+    // qui vient de s'ouvrir et le refermerait aussitôt. On l'ignore.
+    swallowClick = true; setTimeout(() => { swallowClick = false; }, 500);
+    openMixer(); return;
+  }
+  press(t);
+});
+addEventListener("pointercancel", e => {
+  const g = gest; if (!g || e.pointerId !== g.pid) return;
+  gest = null; unpress(g);
+  // Si Android reprend le geste en cours de route, on décide quand même avec le dernier mouvement connu
+  if (g.swipe) endSwipe(g, g.dx);
+});
+function endSwipe(g, dx) {
+  swallowClick = true; setTimeout(() => { swallowClick = false; }, 60);
+  const a = g.pts[0], z = g.pts[g.pts.length - 1];
+  const v = z[0] > a[0] ? (z[1] - a[1]) / (z[0] - a[0]) : 0;           // px/ms sur les ~120 dernières ms
+  let dir = 0;
+  if (Math.abs(v) > 0.25 && Math.sign(v) === Math.sign(dx)) dir = dx < 0 ? 1 : -1;      // geste vif
+  else if (Math.abs(dx) > Math.max(70, innerWidth * 0.12)) dir = dx < 0 ? 1 : -1;      // glissé assez long
+  SW.v = v;
+  slideTo(st.page + dir);
+}
+document.addEventListener("click", e => { if (swallowClick) { swallowClick = false; e.stopPropagation(); e.preventDefault(); } }, true);
+/* Carrousel : la page voisine est dessinée à côté et suit le doigt ; seules des translations
+   (gérées par la carte graphique) bougent pendant le geste, rien n'est redessiné. */
+const SW = { ghost: null, n: -1, W: 0, dx: 0, v: 0, raf: 0, busy: false, rect: null,
+  measure() { this.rect = grid.getBoundingClientRect(); this.W = this.rect.width + 28; } };
+function ensureGhost(n) {
+  if (SW.ghost && SW.n === n) return SW.ghost;
+  dropGhost();
+  if (!SW.rect) SW.measure();
+  const r = SW.rect, L = pageLayout(n, false);
+  const gh = document.createElement("div");
+  gh.className = "grid ghostgrid"; gh.setAttribute("aria-hidden", "true");
+  gh.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;grid-template-columns:repeat(${L.cols},minmax(0,1fr));grid-template-rows:repeat(${L.rows},minmax(0,1fr));pointer-events:none;z-index:1`;
+  gh.innerHTML = L.html;
+  document.body.appendChild(gh);
+  SW.ghost = gh; SW.n = n; paintMedia(); applyX();
+  return gh;
+}
+function dropGhost() { if (SW.ghost) { SW.ghost.remove(); SW.ghost = null; SW.n = -1; } }
+function applyX() {
+  SW.raf = 0;
+  grid.style.transform = `translate3d(${SW.dx}px,0,0)`;
+  if (SW.ghost) SW.ghost.style.transform = `translate3d(${SW.dx + (SW.n > st.page ? SW.W : -SW.W)}px,0,0)`;
+}
+function setX(dx) { SW.dx = dx; if (!SW.raf) SW.raf = requestAnimationFrame(applyX); }
+function slideTo(n) {
+  if (SW.raf) { cancelAnimationFrame(SW.raf); applyX(); }
+  const ok = n >= 0 && n < st.pages.length && n !== st.page;
+  if (!SW.rect) SW.measure();
+  const gh = ok ? ensureGhost(n) : null;
+  const dir = ok ? Math.sign(n - st.page) : 0;
+  const target = dir ? -dir * SW.W : 0;
+  const dist = Math.abs(target - SW.dx);
+  const ms = Math.round(Math.max(150, Math.min(320, dist / Math.max(1.1, Math.abs(SW.v) || 0))));
+  const tr = `transform ${ms}ms cubic-bezier(.22,.8,.24,1)`;
+  SW.busy = true;
+  grid.style.transition = tr; grid.style.transform = `translate3d(${target}px,0,0)`;
+  if (gh) { gh.style.transition = tr; gh.style.transform = "translate3d(0,0,0)"; }
+  else if (SW.ghost) { SW.ghost.style.transition = tr; SW.ghost.style.transform = `translate3d(${SW.n > st.page ? SW.W : -SW.W}px,0,0)`; }
+  setTimeout(() => {
+    if (ok) { st.page = n; save(); renderTabs(); renderGrid(); }
+    grid.style.transition = "none"; grid.style.transform = "";
+    dropGhost(); SW.dx = 0; SW.v = 0; SW.rect = null; SW.busy = false;
+  }, ms + 30);
+}
+function goPage(n) { slideTo(n); }
+addEventListener("resize", () => { SW.rect = null; });
+async function mediaPress(key, el) {
+  try { navigator.vibrate && navigator.vibrate(10); } catch (x) {}
+  const r = await sendKeys([key], "Musique");
+  if (!r.ok) toast(r.reason === "PC non connecté" ? "PC non connecté." : `Échec : ${r.reason}.`);
+  else if (key === "media_play_pause" && M.d) { M.d = { ...M.d, pos: mediaPos(), playing: !M.d.playing }; M.at = performance.now(); paintMedia(); }
+}
+grid.addEventListener("pointerdown", e => {
+  const el = e.target.closest(".tile"); if (!el || el.classList.contains("slot") || el.classList.contains("ghost")) return;
+  if (e.pointerType === "mouse" && e.button !== 0) return;
+  if (editing) startDrag(e, el);
+});
+["pointerup", "pointercancel", "pointerleave"].forEach(ev => grid.addEventListener(ev, e => { const el = e.target.closest && e.target.closest(".tile"); if (el) el.classList.remove("down"); }, true));
+
+/* ---- déplacer les boutons (mode modification) : glisser sur une case, un bouton ou un onglet ---- */
+function placeTile(tiles, t, at) {
+  if (at >= 0) { while (tiles.length < at) tiles.push(null); if (!tiles[at]) { tiles[at] = t; return; } }
+  const free = tiles.indexOf(null);
+  if (free >= 0) tiles[free] = t; else tiles.push(t);
+}
+let drag = null, skipClick = false;
+function startDrag(e, el) {
+  drag = { id: el.dataset.tile, el, pid: e.pointerId, x0: e.clientX, y0: e.clientY, on: false, clone: null, target: null };
+}
+function dropTarget(x, y) {
+  const under = document.elementFromPoint(x, y);
+  const t = under && under.closest(".grid .tile[data-tile], .grid .tile.slot, .tab[data-page]");
+  if (!t || t === drag.el) return null;
+  if (t.matches(".tab") && +t.dataset.page === st.page) return null;
+  return t;
+}
+addEventListener("pointermove", e => {
+  if (!drag || e.pointerId !== drag.pid) return;
+  const dx = e.clientX - drag.x0, dy = e.clientY - drag.y0;
+  if (!drag.on) {
+    if (Math.hypot(dx, dy) < 10) return;
+    drag.on = true;
+    const r = drag.el.getBoundingClientRect();
+    const c = drag.el.cloneNode(true); c.classList.add("dragging"); c.removeAttribute("data-tile");
+    Object.assign(c.style, { width: r.width + "px", height: r.height + "px", left: r.left + "px", top: r.top + "px" });
+    document.body.appendChild(c); drag.clone = c; drag.el.classList.add("lifted");
+    grid.classList.add("dragmode");
+    try { navigator.vibrate && navigator.vibrate(8); } catch (x) {}
+  }
+  drag.clone.style.transform = `translate(${dx}px,${dy}px) scale(1.06)`;
+  const t = dropTarget(e.clientX, e.clientY);
+  if (t !== drag.target) { if (drag.target) drag.target.classList.remove("drop"); drag.target = t; if (t) t.classList.add("drop"); }
+}, { passive: true });
+function endDrag(e, cancel) {
+  if (!drag || (e && e.pointerId !== drag.pid)) return;
+  const d = drag; drag = null;
+  grid.classList.remove("dragmode");
+  if (!d.on) return;           // simple toucher : le clic ouvrira l'éditeur
+  skipClick = true; setTimeout(() => { skipClick = false; }, 60);
+  d.clone.remove(); d.el.classList.remove("lifted"); if (d.target) d.target.classList.remove("drop");
+  if (cancel || !d.target) return;
+  const tiles = pageTiles(); const from = tiles.findIndex(x => x && x.id === d.id); if (from < 0) return;
+  const tile = tiles[from];
+  if (d.target.matches(".tab")) {
+    const dest = st.pages[+d.target.dataset.page]; if (!dest) return;
+    tiles[from] = null; placeTile(dest.tiles, tile, -1);
+    save(); renderGrid(); toast(`« ${tile.label} » déplacé dans « ${dest.name} ».`);
+    return;
+  }
+  const to = d.target.dataset.slot != null ? +d.target.dataset.slot : tiles.findIndex(x => x && x.id === d.target.dataset.tile);
+  if (to < 0) return;
+  while (tiles.length <= to) tiles.push(null);
+  tiles[from] = tiles[to]; tiles[to] = tile;   // case vide : on s'y pose ; bouton : on échange
+  save(); renderGrid();
+}
+addEventListener("pointerup", e => endDrag(e, false));
+addEventListener("pointercancel", e => endDrag(e, true));
+
+grid.addEventListener("click", e => {
+  const el = e.target.closest(".tile"); if (!el) return;
+  if (skipClick) { skipClick = false; return; }
+  if (el.classList.contains("slot")) return openEditor(null, +el.dataset.slot);
+  const t = findTile(el.dataset.tile); if (!t) return;
+  if (editing) return openEditor(t);
+  if (e.detail === 0) { if (t.kind === "rl") openRl(); else if (t.kind === "mixer") openMixer(); else if (t.kind === "media") { const mk = e.target.closest("[data-mkey]"); mediaPress(mk ? mk.dataset.mkey : "media_play_pause", el); } else press(t); } // clavier : pas de pointerdown
+});
+async function press(t) {
+  const sent = sendKeys(t.keys, t.label); // part tout de suite
+  try { navigator.vibrate && navigator.vibrate(12); } catch (x) {}
+  const r = await sent;
+  const el2 = grid.querySelector(`[data-tile="${t.id}"]`);
+  if (r.ok && t.toggle) { st.states[t.id] = !st.states[t.id]; save(); renderGrid(); }
+  const cur = grid.querySelector(`[data-tile="${t.id}"]`) || el2;
+  if (cur) { cur.classList.remove("ok", "fail"); void cur.offsetWidth; cur.classList.add(r.ok ? "ok" : "fail"); }
+  if (!r.ok) toast(r.reason === "PC non connecté" ? "PC non connecté. Vérifie que Stream Deck PC est ouvert." : `Échec : ${r.reason}.`);
+}
+function findTile(id) { for (const p of st.pages) for (const t of p.tiles) if (t && t.id === id) return t; return null; }
+
+/* ---------------- éditeur ---------------- */
+let draft = null;
+const KEYS = [...Array.from({ length: 24 }, (_, i) => "f" + (i + 1)), ..."abcdefghijklmnopqrstuvwxyz0123456789".split("")];
+let addAt = -1;
+function openEditor(t, slot) {
+  addAt = t ? -1 : (slot == null ? -1 : slot);
+  draft = t ? JSON.parse(JSON.stringify(t)) : { id: uid(), label: "Nouveau", icon: "star", color: "sound", keys: ["ctrl", "shift", "f21"], toggle: false, onLabel: "Actif", onColor: "clip", isNew: true };
+  drawEditor();
+}
+function drawEditor(confirmDel) {
+  const d = draft;
+  const typeRow = d.isNew ? `<div class="chips" style="margin-bottom:14px"><button class="chip" data-tkind="button" aria-pressed="${d.kind !== "media"}">Bouton</button><button class="chip" data-tkind="media" aria-pressed="${d.kind === "media"}">${ICONS.music} Musique en cours</button><button class="chip" data-tkind="mixer" aria-pressed="${d.kind === "mixer"}">${ICONS.sliders} Mixer</button><button class="chip" data-tkind="rl" aria-pressed="${d.kind === "rl"}">${RLICON} Rocket League</button></div>` : "";
+  if (d.kind === "mixer") {
+    $("#sheetRoot").innerHTML = `<div class="scrim" data-act="scrim"><div class="sheet" role="dialog" aria-modal="true">
+      <h2>${d.isNew ? "Nouvelle case" : "Mixer"}</h2>${typeRow}
+      <div class="help">Touche la case pour ouvrir le mixer : volume général du PC et volume de chaque appli qui joue du son (Discord, Deezer, Rocket League…), avec un bouton muet chacune. Il faut Stream Deck PC à jour sur le PC.</div>
+      <label class="field" style="margin-top:14px"><span>Nom</span><input id="eLabel" maxlength="24" value="${esc(d.label || "Mixer")}"></label>
+      <h3>Couleur</h3><div class="chips">${Object.entries(COLORS).map(([k, v]) => `<button class="sw" style="--c:${v}" data-color="${k}" aria-pressed="${d.color === k}" aria-label="${k}"></button>`).join("")}</div>
+      ${confirmDel ? `<div class="confirm"><span>Supprimer la case Mixer ?</span><button class="btn" data-act="keep">Garder</button><button class="btn danger solid" data-act="del-yes">Supprimer</button></div>` : ""}
+      <div class="foot">${d.isNew ? "" : `<button class="btn danger left" data-act="del">Supprimer</button>`}<button class="btn" data-act="close">Annuler</button><button class="btn primary" data-act="save-tile">Enregistrer</button></div>
+    </div></div>`;
+    return;
+  }
+  if (d.kind === "media" || d.kind === "rl") {
+    const isRl = d.kind === "rl";
+    $("#sheetRoot").innerHTML = `<div class="scrim" data-act="scrim"><div class="sheet" role="dialog" aria-modal="true">
+      <h2>${d.isNew ? "Nouvelle case" : isRl ? "Rocket League" : "Musique en cours"}</h2>${typeRow}
+      <div class="help">${isRl ? "Ta session Rocket League (matchs en ligne) : victoires, défaites, série en cours et tes stats cumulées. Touche la case pour le détail. Il faut activer les stats dans Stream Deck PC (carte Rocket League)." : "Affiche ce qui joue sur le PC (Deezer, Spotify, YouTube…) : pochette, titre, artiste, avancement, avec précédent / lecture / suivant. Il faut Stream Deck PC à jour sur le PC."}</div>
+      <h3>Taille</h3><div class="chips">${[1, 2, 3].map(n => `<button class="chip" data-size="${n}" aria-pressed="${(d.w || 1) === n}">${n} case${n > 1 ? "s" : ""}</button>`).join("")}</div>
+      ${(d.w || 1) > 1 ? `<p class="hint-s">Les ${d.w - 1 > 1 ? d.w - 1 + " cases" : "case"} à sa droite doivent rester libres, sur la même ligne.</p>` : ""}
+      <h3>Couleur</h3><div class="chips">${Object.entries(COLORS).map(([k, v]) => `<button class="sw" style="--c:${v}" data-color="${k}" aria-pressed="${d.color === k}" aria-label="${k}"></button>`).join("")}</div>
+      ${confirmDel ? `<div class="confirm"><span>Supprimer la case ${isRl ? "Rocket League" : "musique"} ?</span><button class="btn" data-act="keep">Garder</button><button class="btn danger solid" data-act="del-yes">Supprimer</button></div>` : ""}
+      <div class="foot">${d.isNew ? "" : `<button class="btn danger left" data-act="del">Supprimer</button>`}<button class="btn" data-act="close">Annuler</button><button class="btn primary" data-act="save-tile">Enregistrer</button></div>
+    </div></div>`;
+    return;
+  }
+  const media = d.keys.length === 1 && MEDIA[d.keys[0]];
+  const mods = d.keys.filter(k => KEYNAME[k]); const main = d.keys.find(k => !KEYNAME[k]) || "f13";
+  $("#sheetRoot").innerHTML = `<div class="scrim" data-act="scrim"><div class="sheet" role="dialog" aria-modal="true">
+    <h2>${d.isNew ? "Nouveau bouton" : "Modifier le bouton"}</h2>${typeRow}
+    <label class="field"><span>Nom</span><input id="eLabel" maxlength="24" value="${esc(d.label)}"></label>
+    <h3>Couleur</h3><div class="chips">${Object.entries(COLORS).map(([k, v]) => `<button class="sw" style="--c:${v}" data-color="${k}" aria-pressed="${d.color === k}" aria-label="${k}"></button>`).join("")}</div>
+    <h3>Icône</h3><div class="icons">${d.img ? `<button class="cur photo" aria-pressed="true" aria-label="Image choisie"><img src="${d.img}" alt=""></button>` : ""}${d.svg ? `<button class="cur" aria-pressed="true" aria-label="Logo choisi"><img src="${logoSrc(d.svg, COLORS[d.color] || COLORS.plain)}" alt=""></button>` : ""}${Object.entries(ICONS).map(([k, v]) => `<button data-icon="${k}" aria-pressed="${!d.svg && !d.img && d.icon === k}" aria-label="${k}">${v}</button>`).join("")}</div>
+    <div class="logos">
+      <div class="chips ltabs">${[["logos", "Logos"], ["images", "Images en ligne"], ["link", "Lien d'image"]].map(([k, l]) => `<button class="chip" data-lmode="${k}" aria-pressed="${LG.mode === k}">${l}</button>`).join("")}</div>
+      ${LG.mode === "link" ? `<form class="lsearch" id="linkForm"><input id="linkQ" type="url" inputmode="url" placeholder="Colle l'adresse d'une image (https://…)" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Adresse de l'image"><button class="chip" type="submit">Utiliser</button></form>
+        <p class="hint-s">Dans le navigateur : appui long sur une image → « Copier l'adresse de l'image », puis colle-la ici.</p>` : `
+      <form class="lsearch" id="logoForm"><input id="logoQ" type="search" enterkeyhint="search" placeholder="${LG.mode === "images" ? "Images en ligne : un nom, un objet, un lieu…" : "Logos en ligne : Discord, Spotify, Twitch…"}" value="${esc(LG.mode === "images" ? IM.q : LG.q)}" autocomplete="off" aria-label="Chercher"><button class="chip" type="submit">Chercher</button></form>
+      ${LG.mode === "logos" ? `<div class="chips lquick">${LOGO_QUICK.map(q => `<button class="chip" data-logoq="${esc(q)}">${esc(q)}</button>`).join("")}</div>` : ""}
+      <div class="lres" id="logoRes">${LG.mode === "images" ? imgResHTML() : logoResHTML()}</div>`}
+      ${d.img && d.imgCredit ? `<p class="hint-s">Image : ${esc(d.imgCredit)}</p>` : ""}
+    </div>
+    <h3>Action</h3><div class="chips"><button class="chip" data-kind="hotkey" aria-pressed="${!media}">Raccourci clavier</button><button class="chip" data-kind="media" aria-pressed="${!!media}">Musique et volume</button></div>
+    ${media ? `<div class="chips" style="margin-top:10px">${Object.entries(MEDIA).map(([k, v]) => `<button class="chip" data-media="${k}" aria-pressed="${d.keys[0] === k}">${v}</button>`).join("")}</div>`
+      : `<div class="row" style="margin-top:10px;align-items:flex-end"><div class="chips">${["ctrl", "alt", "shift"].map(m => `<button class="chip" data-mod="${m}" aria-pressed="${mods.includes(m)}">${KEYNAME[m]}</button>`).join("")}</div>
+        <label class="field" style="flex:0 1 160px"><span>Touche</span><select id="eKey">${KEYS.map(k => `<option value="${k}" ${k === main ? "selected" : ""}>${k.toUpperCase()}</option>`).join("")}</select></label></div>`}
+    <div class="preview">${esc(describe(d.keys))}</div>
+    <div class="toggle-row" style="margin-top:16px"><div>Bouton à état<small>Pour couper/réactiver : le bouton reste allumé tant que c'est actif.</small></div><button class="switch" role="switch" data-act="toggle" aria-checked="${!!d.toggle}" aria-label="Bouton à état"></button></div>
+    ${d.toggle ? `<label class="field"><span>Texte quand c'est actif</span><input id="eOn" maxlength="14" value="${esc(d.onLabel || "")}"></label>` : ""}
+    ${d.toggle && !d.isNew ? `<div class="toggle-row"><div>Affichage actuel : ${st.states[d.id] ? esc(d.onLabel || "Actif") : "inactif"}<small>À corriger si le bouton ne correspond plus à la réalité. Rien n'est envoyé au PC.</small></div><button class="btn" data-act="flip-state">${st.states[d.id] ? "Afficher inactif" : "Afficher actif"}</button></div>` : ""}
+    ${confirmDel ? `<div class="confirm"><span>Supprimer « ${esc(d.label)} » ?</span><button class="btn" data-act="keep">Garder</button><button class="btn danger solid" data-act="del-yes">Supprimer</button></div>` : ""}
+    <div class="foot">${d.isNew ? "" : `<button class="btn danger left" data-act="del">Supprimer</button>`}<button class="btn" data-act="test">Tester</button><button class="btn" data-act="close">Annuler</button><button class="btn primary" data-act="save-tile">Enregistrer</button></div>
+  </div></div>`;
+}
+/* ---- logos en ligne (bibliothèque Iconify : logos de marques et icônes libres) ----
+   Le logo choisi est copié dans le bouton : il reste affiché sans connexion. */
+const LG = { q: "", res: null, busy: false, err: "", mode: "logos" };
+const IM = { q: "", res: null, busy: false, err: "" };
+// Téléchargement d'une image : dans l'appli Android, on passe par la coque (pas de blocage entre sites)
+const netImg = url => fetch(AND ? "/__net?" + new URLSearchParams({ u: url }) : url);
+function imgResHTML() {
+  if (IM.busy) return `<p class="hint-s">Recherche…</p>`;
+  if (IM.err) return `<p class="hint-s">${esc(IM.err)}</p>`;
+  if (!IM.res) return `<p class="hint-s">Images libres de Wikimedia Commons et Openverse. L'image choisie est recadrée et copiée dans le bouton, rien n'est enregistré sur la tablette.</p>`;
+  if (!IM.res.length) return `<p class="hint-s">Aucune image trouvée pour « ${esc(IM.q)} ».</p>`;
+  return `<div class="photos">${IM.res.map((r, i) => `<button data-photo="${i}" title="${esc(r.title)}"><img loading="lazy" src="${esc(r.thumb)}" alt="${esc(r.title)}"></button>`).join("")}</div>`;
+}
+async function searchImages(q) {
+  q = q.trim(); if (!q) return;
+  IM.q = q; IM.busy = true; IM.err = ""; paintLogos();
+  const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 12000);
+  const commons = fetch("https://commons.wikimedia.org/w/api.php?" + new URLSearchParams({
+      action: "query", generator: "search", gsrsearch: "filetype:bitmap " + q, gsrnamespace: "6", gsrlimit: "40",
+      prop: "imageinfo", iiprop: "url|extmetadata", iiurlwidth: "320", format: "json", origin: "*" }), { signal: ctl.signal })
+    .then(r => r.json()).then(j => Object.values((j.query && j.query.pages) || {}).sort((a, b) => (a.index || 0) - (b.index || 0)).map(p => {
+      const ii = (p.imageinfo || [])[0] || {}, md = ii.extmetadata || {};
+      const strip = h => String(h || "").replace(/<[^>]+>/g, "").trim();
+      return { thumb: ii.thumburl || ii.url, title: p.title.replace(/^File:|^Fichier:/, "").replace(/\.\w+$/, ""),
+        credit: [strip(md.Artist && md.Artist.value), strip(md.LicenseShortName && md.LicenseShortName.value), "Wikimedia Commons"].filter(Boolean).join(" · ") };
+    }).filter(x => x.thumb)).catch(() => []);
+  const openverse = fetch("https://api.openverse.org/v1/images/?" + new URLSearchParams({ q, page_size: "30" }), { signal: ctl.signal })
+    .then(r => r.json()).then(j => (j.results || []).map(x => ({ thumb: x.thumbnail || x.url, title: x.title || q,
+      credit: [x.creator, x.license ? "CC " + String(x.license).toUpperCase() : "", "Openverse"].filter(Boolean).join(" · ") })).filter(x => x.thumb)).catch(() => []);
+  const [a, b] = await Promise.all([commons, openverse]); clearTimeout(tm);
+  IM.res = [...a, ...b].slice(0, 60);
+  if (!IM.res.length && ctl.signal.aborted) { IM.res = null; IM.err = "Pas de connexion aux banques d'images (Wi-Fi ?)."; }
+  IM.busy = false; paintLogos();
+}
+/** Recadre une image en carré 256 px et la garde dans le bouton (JPEG ~20 Ko). */
+async function useImage(url, credit) {
+  try {
+    const r = await netImg(url);
+    if (!r.ok) throw new Error();
+    const blob = await r.blob();
+    if (!/^image\//.test(blob.type || "image/")) throw new Error();
+    const bmp = await createImageBitmap(blob);
+    const side = Math.min(bmp.width, bmp.height), S = 256;
+    const c = document.createElement("canvas"); c.width = c.height = S;
+    c.getContext("2d").drawImage(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side, 0, 0, S, S);
+    const data = c.toDataURL("image/jpeg", 0.85);
+    readDraft(); draft.img = data; draft.imgCredit = credit || ""; delete draft.svg; drawEditor();
+  } catch (e) { toast("Impossible d'utiliser cette image (lien privé ou pas une image)."); }
+}
+const LOGO_QUICK = ["Discord", "Spotify", "Deezer", "Twitch", "YouTube", "OBS", "Steam", "Epic Games", "Rocket League", "Voicemod", "Medal", "Chrome"];
+const ICONIFY = "https://api.iconify.design";
+function logoSrc(svg, color) {
+  // les logos d'une seule couleur prennent la couleur néon du bouton ; les logos en couleurs restent tels quels
+  // les couleurs des boutons sont des variables CSS : on prend leur vraie valeur (une image SVG ne les connaît pas)
+  const m = /^var\((--[\w-]+)\)$/.exec(color || "");
+  if (m) color = getComputedStyle(document.documentElement).getPropertyValue(m[1]).trim() || "#fff";
+  return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(String(svg).replace(/currentColor/g, color || "#fff"));
+}
+function logoResHTML() {
+  if (LG.busy) return `<p class="hint-s">Recherche…</p>`;
+  if (LG.err) return `<p class="hint-s">${esc(LG.err)}</p>`;
+  if (!LG.res) return `<p class="hint-s">Cherche une marque ou un objet : le logo est copié dans le bouton, rien n'est téléchargé sur la tablette.</p>`;
+  if (!LG.res.length) return `<p class="hint-s">Aucun logo trouvé pour « ${esc(LG.q)} ».</p>`;
+  return `<div class="icons">${LG.res.map(n => { const [p, i] = n.split(":"); return `<button data-logo="${esc(n)}" aria-label="${esc(i)}" title="${esc(n)}"><img loading="lazy" src="${ICONIFY}/${encodeURIComponent(p)}/${encodeURIComponent(i)}.svg?height=28&color=%23f4f6ff" alt=""></button>`; }).join("")}</div>`;
+}
+async function searchLogos(q) {
+  q = q.trim(); if (!q) return;
+  LG.q = q; LG.busy = true; LG.err = ""; paintLogos();
+  try {
+    const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 10000);
+    // d'abord les marques (Simple Icons, Logos), puis le reste des icônes libres
+    const url = (pre) => `${ICONIFY}/search?query=${encodeURIComponent(q)}&limit=64${pre ? "&prefixes=" + pre : ""}`;
+    const [a, b] = await Promise.all([fetch(url("simple-icons,logos,skill-icons,devicon"), { signal: ctl.signal }), fetch(url(""), { signal: ctl.signal })]);
+    clearTimeout(tm);
+    const ja = a.ok ? await a.json() : { icons: [] }, jb = b.ok ? await b.json() : { icons: [] };
+    LG.res = [...new Set([...(ja.icons || []), ...(jb.icons || [])])].slice(0, 96);
+  } catch (e) { LG.res = null; LG.err = "Pas de connexion à la bibliothèque de logos (Wi-Fi ?)."; }
+  LG.busy = false; paintLogos();
+}
+function paintLogos() { const r = $("#logoRes"); if (r) r.innerHTML = LG.mode === "images" ? imgResHTML() : logoResHTML(); }
+async function pickLogo(name) {
+  const [p, i] = name.split(":");
+  try {
+    const r = await fetch(`${ICONIFY}/${encodeURIComponent(p)}/${encodeURIComponent(i)}.svg`);
+    const svg = (await r.text()).trim();
+    if (!r.ok || !/^<svg[\s>]/i.test(svg) || svg.length > 40000 || /<script|on\w+=/i.test(svg)) throw new Error("logo invalide");
+    readDraft(); draft.svg = svg; draft.icon = "logo"; delete draft.img; delete draft.imgCredit; drawEditor();
+    const s = $("#sheetRoot .sheet"); const h = s && s.querySelector(".icons"); if (h) h.scrollIntoView({ block: "center" });
+  } catch (e) { toast("Impossible de récupérer ce logo."); }
+}
+
+function readDraft() {
+  const l = $("#eLabel"); if (l) draft.label = l.value.trim() || draft.label;
+  const o = $("#eOn"); if (o) draft.onLabel = o.value.trim();
+  const k = $("#eKey"); if (k) { const mods = draft.keys.filter(x => KEYNAME[x]); draft.keys = [...mods, k.value]; }
+}
+function pageTiles() { return st.pages[st.page].tiles; }
+document.addEventListener("submit", e => {
+  if (e.target.id === "logoForm") { e.preventDefault(); (LG.mode === "images" ? searchImages : searchLogos)($("#logoQ").value); }
+  if (e.target.id === "linkForm") { e.preventDefault(); const u = $("#linkQ").value.trim(); if (/^https?:\/\//i.test(u)) useImage(u, ""); else toast("Colle une adresse qui commence par https://"); }
+});
+
+/* ---------------- réglages ---------------- */
+function openSettings(confirmReset) {
+  $("#sheetRoot").innerHTML = `<div class="scrim" data-act="scrim"><div class="sheet" role="dialog" aria-modal="true">
+    <h2>Réglages</h2>
+    <div class="toggle-row" style="border:0"><div>PC<small>${st.pc ? esc(st.pc) + " · " + (C.state === "on" ? "connecté" : "non connecté") : "aucun"}</small></div><button class="btn" data-act="setup">Changer</button></div>
+    <div class="toggle-row"><div>Colonnes</div><div class="chips">${[3, 4, 5, 6, 7].map(n => `<button class="chip" data-cols="${n}" aria-pressed="${st.cols === n}">${n}</button>`).join("")}</div></div>
+    <div class="toggle-row"><div>Page « ${esc(st.pages[st.page].name)} »<small>Renommer ou supprimer la page affichée.</small></div><div class="chips"><button class="chip" data-act="rename-page">Renommer</button>${st.pages.length > 1 ? `<button class="chip" data-act="del-page">Supprimer</button>` : ""}</div></div>
+    <div class="toggle-row"><div>Veille de l'écran<small>Sans toucher la tablette, l'écran passe au minimum et le Wi-Fi s'économise. Un toucher le rallume (sans appuyer sur un bouton).</small></div><div class="chips">${[[30, "30 s"], [60, "1 min"], [120, "2 min"], [300, "5 min"], [0, "Jamais"]].map(([v, l]) => `<button class="chip" data-sleep="${v}" aria-pressed="${(st.sleep ?? 60) === v}">${l}</button>`).join("")}</div></div>
+    <div class="toggle-row"><div>États des boutons<small>Si un bouton affiche « Coupé » alors que ce n'est plus le cas.</small></div><button class="btn" data-act="reset-states">Tout éteindre</button></div>
+    ${AND ? `<div class="toggle-row"><div>Version<small>Appli ${esc(call("appVersion") || "?")} · interface ${esc(call("webVersion") || "?")}</small></div></div>` : ""}
+    <div class="toggle-row"><div>Guide<small>Installation, Discord, Voicemod, Medal, personnalisation, dépannage.</small></div><button class="btn primary" data-act="guide">Ouvrir le guide</button></div>
+    ${AND ? `<h3>Tablette</h3><div class="chips"><button class="chip" data-native="openWifi">Wi-Fi</button><button class="chip" data-native="openSettings">Réglages Android</button><button class="chip" data-native="openSamsungHome">Écran d'accueil Samsung</button><button class="chip" data-native="checkUpdate">Mise à jour</button></div>` : ""}
+    ${confirmReset ? `<div class="confirm"><span>Remettre tous les boutons d'origine ? Tes modifications seront perdues.</span><button class="btn" data-act="keep-set">Annuler</button><button class="btn danger solid" data-act="reset-yes">Remettre</button></div>` : ""}
+    <div class="foot"><button class="btn danger left" data-act="reset-ask">Boutons d'origine</button><button class="btn primary" data-act="close">Fermer</button></div>
+  </div></div>`;
+}
+
+/* ---------------- guide ---------------- */
+function openGuide() {
+  $("#sheetRoot").innerHTML = `<div class="scrim" data-act="scrim"><div class="sheet guide" role="dialog" aria-modal="true">
+    <h2>Guide</h2>
+    <details open><summary>1. Installer le programme sur le PC</summary><div class="gbody"><ol>
+      <li>Sur le PC, télécharge <b>StreamDeckPC.exe</b> depuis la page Releases du repo <b>liseuse</b> sur GitHub.</li>
+      <li>Lance-le. Si Windows affiche « Windows a protégé votre ordinateur » : <b>Informations complémentaires</b>, puis <b>Exécuter quand même</b>.</li>
+      <li>Si le pare-feu demande, autorise les <b>réseaux privés</b>.</li>
+      <li>Dans la fenêtre, réponds <b>Oui</b> à « Lancer Stream Deck PC avec Windows ? » pour ne plus avoir à le lancer.</li>
+      <li>Fermer la fenêtre la range près de l'horloge (icône touche + éclair) : le Stream Deck continue de marcher. Pour l'arrêter : clic droit sur l'icône → <b>Quitter</b>.</li></ol></div></details>
+    <details><summary>2. Relier la tablette</summary><div class="gbody"><ol>
+      <li>La fenêtre du programme affiche une <b>adresse</b> et un <b>code à 6 chiffres</b>.</li>
+      <li>Sur la tablette : Réglages → PC → <b>Changer</b>, tape l'adresse et le code.</li>
+      <li>Le rond en haut à gauche passe au vert : c'est connecté.</li></ol>
+      La tablette et le PC doivent être sur la même box. La tablette se reconnecte toute seule si le PC redémarre.</div></details>
+    <details><summary>3. Brancher Discord</summary><div class="gbody"><ol>
+      <li>Dans Discord : Paramètres utilisateur → <b>Raccourcis clavier</b> → ajouter un raccourci.</li>
+      <li>Choisis l'action pour couper le micro, clique sur le champ du raccourci, puis appuie sur <b>Micro</b> sur la tablette.</li>
+      <li>Ajoute un deuxième raccourci pour la sourdine et appuie sur <b>Casque</b>.</li></ol></div></details>
+    <details><summary>4. Brancher Voicemod</summary><div class="gbody"><ul>
+      <li><b>Voix</b> : dans les réglages de Voicemod, clique sur le raccourci qui active ou coupe le changement de voix, puis appuie sur <b>Voix</b>.</li>
+      <li><b>Soundboard</b> : sur chaque son, clique sur son raccourci puis appuie sur <b>Son 1</b>, <b>Son 2</b>… Renomme ensuite les boutons avec le crayon.</li>
+      <li><b>Stop sons</b> : assigne-le au raccourci qui arrête tous les sons.</li></ul>
+      Tes potes entendent les sons sur Discord tant que Voicemod est réglé comme micro dans Discord.</div></details>
+    <details><summary>5. Brancher Medal</summary><div class="gbody">Dans Medal, ouvre les réglages des clips, clique sur la touche qui enregistre un clip, puis appuie sur <b>Clip</b>. Après un but, un appui suffit pour garder l'action.</div></details>
+    <details><summary>6. Personnaliser les boutons</summary><div class="gbody"><ul>
+      <li>Touche le <b>crayon</b> en haut : les boutons bougent légèrement, touche-en un pour le modifier (nom, couleur, icône, touche envoyée).</li>
+      <li>Pour changer de page, <b>glisse vers la gauche ou la droite</b> n'importe où sur la grille (ou touche le nom de la page en haut).</li>
+      <li>Case <b>Musique en cours</b> : en modification, touche une case vide puis choisis <b>Musique en cours</b> (1, 2 ou 3 cases de large). Elle affiche ce qui joue sur le PC (Deezer, Spotify…) avec précédent / lecture / suivant.</li>
+      <li><b>Batterie</b> : affichée en haut à droite. Sans toucher la tablette (1 min par défaut, réglable dans Réglages → Veille de l'écran), l'écran passe au minimum avec l'heure ; un toucher le rallume sans appuyer sur un bouton.</li>
+      <li><b>Images</b> : dans la fiche d'un bouton, onglet <b>Images en ligne</b> (banques d'images libres) ou <b>Lien d'image</b> (colle l'adresse d'une image trouvée n'importe où). L'image est recadrée et copiée dans le bouton, rien n'est enregistré sur la tablette.</li>
+      <li><b>Logos</b> : dans la fiche d'un bouton, cherche un logo en ligne (Discord, Spotify, Twitch…) sous les icônes. Il est copié dans le bouton : il reste affiché sans connexion. Les logos d'une couleur prennent la couleur du bouton.</li>
+      <li><b>Rocket League</b> : touche une case vide (+) en modification et choisis <b>Rocket League</b> (1 à 3 cases). Elle montre ta session (victoires, défaites, série) ; touche-la pour le détail. La session s'affiche aussi sur l'écran de veille. À activer une fois dans Stream Deck PC (carte Rocket League).</li>
+      <li><b>Mixer</b> : bouton à curseurs en haut à droite (ou une case Mixer : touche une case vide (+) en modification et choisis <b>Mixer</b>). Elle ouvre le volume général et le volume de chaque appli du PC (Discord, Deezer, jeu…), avec un bouton muet chacune.</li>
+      <li>Pour <b>déplacer</b> un bouton, fais-le glisser : sur une case vide il s'y pose, sur un autre bouton ils échangent leur place, sur un onglet il part dans cette page.</li>
+      <li>Touche une <b>case vide (+)</b> pour créer un bouton à cet endroit. <b>+ Page</b> crée une page.</li>
+      <li><b>Bouton à état</b> : le bouton reste allumé tant que c'est actif (micro coupé, voix activée…).</li>
+      <li><b>Tester</b> envoie la touche tout de suite, pratique pour l'assigner dans un logiciel.</li>
+      <li>Réglages → <b>Colonnes</b> pour des boutons plus grands ou plus petits.</li></ul></div></details>
+    <details><summary>7. Astuces</summary><div class="gbody"><ul>
+      <li>Les boutons envoient des touches comme <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>F13</kbd> qui n'existent pas sur ton clavier : aucun conflit avec Rocket League, et ça marche en pleine partie.</li>
+      <li>Si un bouton affiche « Coupé » alors que ce n'est plus le cas : <b>Modifier</b>, touche le bouton, puis <b>Afficher inactif</b>. L'affichage se corrige sans rien envoyer.</li>
+      <li>Les boutons de la page <b>Musique & PC</b> contrôlent Spotify, YouTube ou ton lecteur sans rien régler.</li></ul></div></details>
+    <details><summary>Ça ne marche pas ?</summary><div class="gbody"><ul>
+      <li><b>Rond orange ou « PC introuvable »</b> : vérifie que StreamDeckPC est ouvert sur le PC et que les deux appareils sont sur le même Wi-Fi. Si l'adresse affichée par le PC a changé, mets-la à jour dans Réglages → PC.</li>
+      <li><b>« Code refusé »</b> : retape le code affiché dans la fenêtre du PC.</li>
+      <li><b>Le bouton clignote en vert mais rien ne se passe</b> : la touche n'est pas encore assignée dans le logiciel (voir étapes 3 à 5).</li>
+      <li><b>Le pare-feu a bloqué le programme</b> : Paramètres Windows → Pare-feu → Autoriser une application → coche StreamDeckPC pour les réseaux privés.</li>
+      <li><b>L'antivirus supprime le .exe</b> : c'est fréquent pour un programme non signé qui simule des touches. Ajoute-le aux exceptions si tu lui fais confiance.</li></ul></div></details>
+    <div class="foot"><button class="btn" data-act="settings">Réglages</button><button class="btn primary" data-act="close">Fermer</button></div>
+  </div></div>`;
+}
+
+/* ---------------- événements ---------------- */
+document.addEventListener("click", async e => {
+  const t = e.target;
+  const pg = t.closest("[data-page]");
+  if (pg) { const n = +pg.dataset.page; if (!editing && !SW.busy && n !== st.page && Math.abs(n - st.page) === 1) { SW.dx = 0; SW.measure(); slideTo(n); } else { st.page = n; save(); render(); } return; }
+  const nat = t.closest("[data-native]"); if (nat) { call(nat.dataset.native); return; }
+  if (t.closest("#editBtn")) { editing = !editing; render(); if (editing) toast("Touche un bouton pour le modifier, fais-le glisser pour le déplacer.", 3200); return; }
+  if (t.closest("#setBtn")) { openSettings(); return; }
+  if (t.closest("#mixBtn")) { openMixer(); return; }
+  if (draft && $("#sheetRoot").innerHTML) {
+    const c = t.closest("[data-color]"); if (c) { readDraft(); draft.color = c.dataset.color; drawEditor(); return; }
+    const tk = t.closest("[data-tkind]");
+    if (tk) { readDraft(); const k = tk.dataset.tkind;
+      if (k === "media") Object.assign(draft, { kind: "media", label: "Musique", color: "music", w: 2, keys: [], toggle: false });
+      else if (k === "rl") { Object.assign(draft, { kind: "rl", label: "Rocket League", color: "music", w: 2, keys: [], toggle: false }); }
+      else if (k === "mixer") { delete draft.w; Object.assign(draft, { kind: "mixer", label: "Mixer", color: "mod", icon: "sliders", keys: [], toggle: false }); }
+      else { delete draft.kind; delete draft.w; Object.assign(draft, { label: "Nouveau", color: "sound", icon: "star", keys: ["ctrl", "shift", "f21"] }); }
+      drawEditor(); return; }
+    const sz = t.closest("[data-size]"); if (sz) { draft.w = +sz.dataset.size; drawEditor(); return; }
+    const ic = t.closest("[data-icon]"); if (ic) { readDraft(); draft.icon = ic.dataset.icon; delete draft.svg; delete draft.img; delete draft.imgCredit; drawEditor(); return; }
+    const lm = t.closest("[data-lmode]"); if (lm) { readDraft(); LG.mode = lm.dataset.lmode; drawEditor(); return; }
+    const ph = t.closest("[data-photo]"); if (ph) { const r = IM.res && IM.res[+ph.dataset.photo]; if (r) { ph.disabled = true; useImage(r.thumb, r.credit); } return; }
+    const lg = t.closest("[data-logo]"); if (lg) { pickLogo(lg.dataset.logo); return; }
+    const lq = t.closest("[data-logoq]"); if (lq) { const inp = $("#logoQ"); if (inp) inp.value = lq.dataset.logoq; searchLogos(lq.dataset.logoq); return; }
+    const kd = t.closest("[data-kind]"); if (kd) { readDraft(); draft.keys = kd.dataset.kind === "media" ? ["media_play_pause"] : ["ctrl", "shift", "f21"]; drawEditor(); return; }
+    const md = t.closest("[data-media]"); if (md) { readDraft(); draft.keys = [md.dataset.media]; drawEditor(); return; }
+    const mo = t.closest("[data-mod]"); if (mo) { readDraft(); const m = mo.dataset.mod; const mods = new Set(draft.keys.filter(x => KEYNAME[x])); mods.has(m) ? mods.delete(m) : mods.add(m); const main = draft.keys.find(x => !KEYNAME[x]); draft.keys = ["ctrl", "alt", "shift"].filter(x => mods.has(x)).concat(main); drawEditor(); return; }
+  }
+  const sl = t.closest("[data-sleep]"); if (sl) { st.sleep = +sl.dataset.sleep; save(); armSleep(); openSettings(); return; }
+  const co = t.closest("[data-cols]"); if (co) { st.cols = +co.dataset.cols; save(); renderGrid(); openSettings(); return; }
+  const a = t.closest("[data-act]"); if (!a) return;
+  const act = a.dataset.act;
+  if (act === "scrim" && t !== a) return;
+  if (act === "scrim" || act === "close") { $("#sheetRoot").innerHTML = ""; draft = null; return; }
+  if (act === "rl-reset") { drawRl(true); return; }
+  if (act === "rl-keep") { drawRl(); return; }
+  if (act === "rl-reset-yes") { if (C.state === "on" && C.ws) try { C.ws.send(JSON.stringify({ type: "rl_reset" })); } catch (e) {} drawRl(); toast("Session remise à zéro."); return; }
+  if (act === "toggle") { readDraft(); draft.toggle = !draft.toggle; drawEditor(); }
+  if (act === "flip-state") { readDraft(); st.states[draft.id] = !st.states[draft.id]; save(); renderGrid(); drawEditor(); }
+  else if (act === "test") { readDraft(); const r = await sendKeys(draft.keys, draft.label); toast(r.ok ? `Envoyé : ${describe(draft.keys)}` : `Échec : ${r.reason}.`); drawEditor(); }
+  else if (act === "save-tile") {
+    readDraft(); const isNew = draft.isNew; delete draft.isNew;
+    if (isNew) placeTile(pageTiles(), draft, addAt); else { for (const p of st.pages) { const j = p.tiles.findIndex(x => x && x.id === draft.id); if (j >= 0) p.tiles[j] = draft; } }
+    if (!draft.toggle) delete st.states[draft.id];
+    let room = "";
+    if ((draft.kind === "media" || draft.kind === "rl") && draft.w > 1) {
+      const tl = pageTiles(), i = tl.findIndex(x => x && x.id === draft.id), cols = Math.max(2, Math.min(innerWidth < 640 ? 3 : 8, st.cols));
+      let free = 1; while (free < draft.w && i % cols + free < cols && !tl[i + free]) free++;
+      if (i >= 0 && free < draft.w) room = ` Libère ${draft.w - 1 > 1 ? "les " + (draft.w - 1) + " cases" : "la case"} à sa droite (ou déplace-la en début de ligne) pour l'avoir sur ${draft.w} cases.`;
+    }
+    save(); $("#sheetRoot").innerHTML = ""; draft = null; renderGrid(); toast((isNew ? "Case ajoutée." : "Enregistré.") + room, room ? 5000 : 2400);
+  }
+  else if (act === "del") { readDraft(); drawEditor(true); }
+  else if (act === "keep") drawEditor();
+  else if (act === "del-yes") { for (const p of st.pages) p.tiles = p.tiles.map(x => x && x.id === draft.id ? null : x); delete st.states[draft.id]; save(); $("#sheetRoot").innerHTML = ""; draft = null; renderGrid(); toast("Bouton supprimé."); }
+  else if (act === "add-page") { st.pages.push({ id: uid(), name: "Page " + (st.pages.length + 1), tiles: [] }); st.page = st.pages.length - 1; save(); render(); }
+  else if (act === "rename-page") { $("#sheetRoot").innerHTML = `<div class="scrim" data-act="scrim"><div class="sheet"><h2>Renommer la page</h2><label class="field"><span>Nom</span><input id="pName" maxlength="20" value="${esc(st.pages[st.page].name)}"></label><div class="foot"><button class="btn" data-act="close">Annuler</button><button class="btn primary" data-act="save-page">Enregistrer</button></div></div></div>` }
+  else if (act === "save-page") { const v = $("#pName").value.trim(); if (v) st.pages[st.page].name = v; save(); $("#sheetRoot").innerHTML = ""; render(); }
+  else if (act === "del-page") { if (st.pages.length > 1) { st.pages.splice(st.page, 1); st.page = 0; save(); $("#sheetRoot").innerHTML = ""; render(); toast("Page supprimée."); } }
+  else if (act === "reset-states") { st.states = {}; save(); renderGrid(); toast("Tous les boutons sont éteints."); }
+  else if (act === "reset-ask") openSettings(true);
+  else if (act === "keep-set") openSettings();
+  else if (act === "reset-yes") { st.pages = defaults(); st.page = 0; st.states = {}; save(); $("#sheetRoot").innerHTML = ""; render(); toast("Boutons d'origine remis."); }
+  else if (act === "guide") openGuide();
+  else if (act === "settings") openSettings();
+  else if (act === "setup") { $("#sheetRoot").innerHTML = ""; showSetup(); }
+  else if (act === "cancel-setup") showDeck();
+  else if (act === "save-pc") {
+    const ip = $("#pcIp").value.trim(), code = $("#pcCode").value.trim();
+    if (!/^[\w.-]+$/.test(ip)) { $("#setErr").textContent = "Tape l'adresse affichée par le PC, par exemple 192.168.1.23."; return; }
+    if (!/^\d{6}$/.test(code)) { $("#setErr").textContent = "Le code fait 6 chiffres."; return; }
+    st.pc = ip; st.code = code; save(); C.lastErr = ""; C.retry = 0; $("#setErr").textContent = "Connexion…"; connect();
+    setTimeout(() => { if (!$("#setup").hidden && C.state !== "on" && !C.lastErr) $("#setErr").textContent = "Le PC ne répond pas. Vérifie que Stream Deck PC est ouvert et que la tablette est sur le même Wi-Fi."; }, 5000);
+  }
+});
+document.addEventListener("keydown", e => { if (e.key === "Enter" && e.target.id === "pcCode") document.querySelector('[data-act="save-pc"]').click(); });
+window.liseuseBack = () => { if ($("#sheetRoot").innerHTML) { $("#sheetRoot").innerHTML = ""; draft = null; return true; } if (editing) { editing = false; render(); return true; } return true; };
+window.liseuseHome = () => { $("#sheetRoot").innerHTML = ""; draft = null; editing = false; if (st.pc) showDeck(); };
+// Mise à jour automatique : dès que la nouvelle interface est téléchargée, on l'applique
+// au premier moment calme (aucune fenêtre ouverte, pas en modification, 20 s sans appui).
+let lastTouch = Date.now(), updatePending = false;
+addEventListener("pointerdown", () => { lastTouch = Date.now(); }, true);
+function applyUpdateWhenIdle() {
+  if (!updatePending) return;
+  if (editing || $("#sheetRoot").innerHTML || !$("#setup").hidden || Date.now() - lastTouch < 20000) return void setTimeout(applyUpdateWhenIdle, 5000);
+  call("reload");
+}
+window.liseuseUpdateReady = () => { updatePending = true; toast("Mise à jour téléchargée, elle s'installe toute seule.", 3000); setTimeout(applyUpdateWhenIdle, 5000); };
+let rz = 0; addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(renderGrid, 100); });
+
+function tick() { const t = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }); $("#clock").textContent = t; const sc = document.getElementById("sleepClock"); if (sc) sc.textContent = t; }
+tick(); setInterval(tick, 15000);
+
+/* ---------------- batterie de la tablette ---------------- */
+async function readBattery() {
+  let lvl = call("battery"), chg = call("charging");
+  if ((lvl == null || lvl < 0) && navigator.getBattery) { try { const b = await navigator.getBattery(); lvl = Math.round(b.level * 100); chg = b.charging; } catch (e) {} }
+  if (lvl == null || lvl < 0) return null;
+  return { lvl, chg: !!chg };
+}
+async function paintBattery() {
+  const b = await readBattery(); const el = $("#bat"); if (!b) { el.hidden = true; return; }
+  el.hidden = false;
+  el.className = "bat" + (b.chg ? " chg" : b.lvl <= 15 ? " low" : b.lvl <= 35 ? " mid" : "");
+  el.querySelector("i").style.width = Math.max(4, b.lvl) + "%";
+  $("#batTxt").textContent = b.lvl + " %";
+  el.setAttribute("aria-label", `Batterie ${b.lvl} %${b.chg ? ", en charge" : ""}`);
+  const sb = $("#sleepBat"); if (sb) sb.textContent = `${b.chg ? "⚡ " : ""}${b.lvl} %`;
+}
+paintBattery(); setInterval(paintBattery, 60000);
+
+/* ---------------- veille : écran au minimum quand on ne touche pas ---------------- */
+// L'écran est de loin ce qui consomme le plus. En veille : luminosité minimale, écran noir avec l'heure,
+// plus d'animations, Wi-Fi rendu à l'économie d'énergie et connexion au PC vérifiée 6× moins souvent.
+let asleep = false, sleepT = 0;
+function armSleep() {
+  clearTimeout(sleepT);
+  const s = st.sleep ?? 60;
+  if (s > 0 && !asleep) sleepT = setTimeout(goSleep, s * 1000);
+}
+function goSleep() {
+  if (editing || $("#sheetRoot").innerHTML || !$("#setup").hidden || gest || SW.busy) { armSleep(); return; }
+  asleep = true;
+  document.body.classList.add("asleep");
+  let ov = $("#sleep");
+  if (!ov) { ov = document.createElement("div"); ov.id = "sleep"; ov.innerHTML = `<div class="sclock" id="sleepClock"></div><div class="sbat" id="sleepBat"></div><div class="srl" id="sleepRl"></div><p>Touche l'écran pour rallumer</p>`; document.body.appendChild(ov); }
+  ov.hidden = false; $("#sleepClock").textContent = $("#clock").textContent; paintBattery(); paintRl();
+  call("setBrightness", 0.01); call("lowLatency", false); pingEvery(30000);
+}
+function wake() {
+  if (!asleep) { armSleep(); return; }
+  asleep = false;
+  document.body.classList.remove("asleep");
+  const ov = $("#sleep"); if (ov) ov.hidden = true;
+  call("setBrightness", -1); call("lowLatency", true); pingEvery(5000); ping(); paintMedia(); paintBattery();
+  armSleep();
+}
+// Le premier toucher pendant la veille ne fait que rallumer : il n'appuie sur rien
+addEventListener("pointerdown", e => {            // sur window : passe avant tous les autres gestes
+  if (asleep) { e.preventDefault(); e.stopPropagation(); swallowClick = true; setTimeout(() => { swallowClick = false; }, 400); wake(); return; }
+  armSleep();
+}, true);
+window.liseuseWake = () => { if (C.state !== "on" && st.pc) connect(); paintBattery(); wake(); };
+
+/* ---------------- démarrage ---------------- */
+call("keepScreenOn", true);
+armSleep();
+if (st.pc) { showDeck(); connect(); } else { showSetup(); setStatus("off", "Pas de PC"); }
+call("ready");
+window.__deck = { st, C, sendKeys };
+})();
+</script>
+</body>
+</html>
